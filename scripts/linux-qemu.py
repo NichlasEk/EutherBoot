@@ -56,7 +56,7 @@ with tempfile.TemporaryDirectory(prefix='eutherboot-linux-') as tmp:
         (own/'EFI/Linux/kernel.efi').write_bytes(b'wrong volume kernel')
         (own/'EFI/Linux/initrd.cpio').write_bytes(b'wrong volume initrd')
         (own/'EFI/Linux/test.efi').write_bytes(b'wrong volume UKI')
-    if a.case=='editor':shutil.copy2(fixtures/'initrd.cpio',target/'EFI/Linux/edited.cpio')
+    if a.case=='editor':(target/'EFI/Linux/initrd.cpio').rename(target/'EFI/Linux/edited.cpio')
     if a.case=='missing-initrd':(target/'EFI/Linux/initrd.cpio').unlink()
     if a.case=='not-linux':shutil.copy2(ROOT/'artifacts/TestChild.efi',target/'EFI/Linux/kernel.efi')
     kind='efi' if uki else 'linux-efi'
@@ -93,7 +93,10 @@ with tempfile.TemporaryDirectory(prefix='eutherboot-linux-') as tmp:
             text=v.log.read_text()
             assert text.count('CHAINLOAD_LOADED')==1
             if uki:assert 'LOAD_OPTIONS_SET' not in text and 'LINUX_EFI_PREPARED' not in text
-            else:assert 'LINUX_EFI_PREPARED' in text and 'LOAD_OPTIONS_SET' in text
+            else:
+                assert 'LINUX_EFI_PREPARED' in text and 'LOAD_OPTIONS_SET' in text
+                assert 'INITRD_INSTALLED' in text and 'INITRD_SIZE_QUERY' in text and 'INITRD_COPIED' in text
+                assert 'initrd=' not in (v.base/'serial.log').read_text()
             if remote:assert 'TIMEOUT_FIRED' in text
             assert 'MENU_RESUMED' not in text # Actual Linux handoff did not return as an EFI child.
     if a.case=='editor':
@@ -107,7 +110,8 @@ with tempfile.TemporaryDirectory(prefix='eutherboot-linux-') as tmp:
         with vm(2) as v:
             v.key('ret','CHAINLOAD_LOADED');wait_linux(v,'EUTHERBOOT_LINUX_PID1_OK stub')
             serial=(v.base/'serial.log').read_text()
-            assert 'eutherboot_editor=kept' in serial and r'initrd=\EFI\Linux\edited.cpio' in serial
+            assert 'eutherboot_editor=kept' in serial and 'initrd=' not in serial
+            assert 'INITRD_COPIED' in v.log.read_text()
         assert digest(disk)==stable
     elif a.case=='uki-write':
         # The systemd stub is an independent application: document its observed

@@ -40,6 +40,7 @@ impl UefiStore {
                 | transaction::BACKUP
                 | transaction::MARKER
                 | "editor-fault"
+                | "initrd-fault"
         ) {
             return Err("Unexpected configuration filename".into());
         }

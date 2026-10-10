@@ -1,5 +1,6 @@
-//! x86_64 EFI-stub setup. Linux owns initrd loading and ExitBootServices.
+//! x86_64 EFI-stub setup. Preload initrd; Linux chooses its final location.
 use crate::volumes::protocol;
+use alloc::vec::Vec;
 use boot_core::config::Entry;
 use uefi::{
     CString16, Handle, Status,
@@ -9,7 +10,12 @@ use uefi::{
     },
 };
 
-pub fn prepare(device: Handle, entry: &Entry) -> Result<CString16, Status> {
+pub struct Prepared {
+    pub options: CString16,
+    pub initrd: Option<Vec<u8>>,
+}
+pub fn prepare(device: Handle, entry: &Entry) -> Result<Prepared, Status> {
+    crate::initrd::ensure_absent()?;
     let options = boot_core::linux::load_options(entry.cmdline().unwrap_or(""), entry.initrd())
         .map_err(|_| Status::INVALID_PARAMETER)?;
     let mut fs = protocol::<SimpleFileSystem>(device)?;
@@ -40,7 +46,11 @@ pub fn prepare(device: Handle, entry: &Entry) -> Result<CString16, Status> {
     if options.len() > capacity as usize {
         return Err(Status::BAD_BUFFER_SIZE);
     }
+    let mut payload = None;
     if let Some(path) = entry.initrd() {
+        if !boot_core::linux::supports_load_file2(&header[..n]) {
+            return Err(Status::UNSUPPORTED);
+        }
         let path = CString16::try_from(path).map_err(|_| Status::INVALID_PARAMETER)?;
         let mut initrd = root
             .open(&path, FileMode::Read, FileAttribute::empty())
@@ -54,11 +64,32 @@ pub fn prepare(device: Handle, entry: &Entry) -> Result<CString16, Status> {
         if size == 0 || size > 128 * 1024 * 1024 {
             return Err(Status::BAD_BUFFER_SIZE);
         }
-        // The EFI stub reads the payload itself; check readability before transferring control.
-        if initrd.read(&mut [0u8; 1]).map_err(|e| e.status())? != 1 {
-            return Err(Status::END_OF_FILE);
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(size as usize)
+            .map_err(|_| Status::OUT_OF_RESOURCES)?;
+        bytes.resize(size as usize, 0);
+        let mut offset = 0;
+        while offset < bytes.len() {
+            let end = (offset + 1024 * 1024).min(bytes.len());
+            let read = initrd
+                .read(&mut bytes[offset..end])
+                .map_err(|e| e.status())?;
+            if read == 0 {
+                return Err(Status::END_OF_FILE);
+            }
+            offset += read;
         }
+        // Detect growth during the read; never silently truncate the selected file.
+        if initrd.read(&mut [0u8; 1]).map_err(|e| e.status())? != 0 {
+            return Err(Status::BAD_BUFFER_SIZE);
+        }
+        crate::trace("INITRD_PRELOADED");
+        payload = Some(bytes);
     }
     crate::trace("LINUX_EFI_PREPARED");
-    CString16::try_from(options.as_str()).map_err(|_| Status::INVALID_PARAMETER)
+    Ok(Prepared {
+        options: CString16::try_from(options.as_str()).map_err(|_| Status::INVALID_PARAMETER)?,
+        initrd: payload,
+    })
 }

@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
 extern crate alloc;
+mod initrd;
 
 use uefi::{
     boot,
@@ -49,6 +50,10 @@ fn main() -> Status {
         return Status::DEVICE_ERROR;
     }
     trace("CHILD_CONTEXT_OK");
+    if let Err(s) = initrd::probe() {
+        trace(&alloc::format!("CHILD_INITRD_ERROR {s:?}"));
+        return s;
+    }
     // Report the actual firmware-provided child volume, not the parent's intent.
     if let Ok(image) = boot::open_protocol_exclusive::<LoadedImage>(boot::image_handle()) {
         if let Some(device) = image.device() {

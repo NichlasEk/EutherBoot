@@ -98,22 +98,49 @@ exits boot services cannot be recovered by this menu.
 
 ## Linux EFI-stub boundary
 
-`boot-core::linux` validates printable ASCII command lines and composes one explicit
-`initrd=` argument before user options (including a possible `--`). `uefi-app::linux`
-opens the selected ESP read-only, checks PE32+ x86_64 application plus Linux HdrS,
-boot signature and protocol >= 2.11, checks the kernel's command-line capacity,
-and preflights the initrd's type, size and readability. File/protocol borrows end
-before LoadImage/StartImage. This preflight is not cryptographic validation or a
-protection against concurrent replacement.
+`boot-core::linux` validates printable ASCII command lines and the explicit
+initrd path without adding a path to LoadOptions. `uefi-app::linux` checks PE32+
+x86_64 application plus Linux HdrS, boot signature and protocol >= 2.11, and the
+kernel's command-line capacity. If an initrd is configured, it separately checks
+the PE ImageVersion capability: EFI-stub v1/v2, or bit 0 in v3+ per Linux pe.h.
+This is independent of the x86 HdrS boot-protocol version. A pre-existing provider
+on the Linux initrd device path blocks linux-efi preparation, including no-initrd
+entries; EutherBoot never replaces or silently consumes someone else's provider.
+
+The selected volume is opened read-only. The nonempty regular initrd file is
+bounded to 128 MiB, allocated fallibly, and read fully in chunks, detecting early
+EOF and growth. All file/protocol handles close before LoadImage. This snapshot
+removes callback-time disk I/O; it is not cryptographic validation or protection
+against replacement while reading. The kernel receives a separate copy, so the
+snapshot adds to peak boot memory. UKIs remain ordinary EFI entries with embedded
+resources and no EutherBoot initrd provider or LoadOptions overrides.
+
+`initrd` uses uefi-rs installation/removal wrappers and the uefi-raw LoadFile2 ABI.
+A stable owned context contains the callback, immutable bytes and a builder-created
+vendor-media device path using LINUX_EFI_INITRD_MEDIA_GUID. DevicePath is installed
+first and LoadFile2 last, after image authentication and before StartImage. The
+callback accepts only the remaining EndEntire node and BootPolicy=false. It checks
+null parameters, reports required size, preserves short buffers and copies only
+the payload into a sufficiently large caller-owned buffer. It allocates nothing
+and performs no firmware/file I/O. EFI callers must supply valid readable/writable
+memory: a protocol is not a sandbox for malicious firmware or applications.
+
+Context ownership is raw only while published, so no Rust mutable Context borrow
+spans protocol notifications or child callbacks. A Drop guard removes LoadFile2
+first, then DevicePath, before freeing data. Partial installation rolls back through
+the same guard. Child release/unload precedes provider removal. If firmware refuses
+removal, the guard retains memory and callback code and blocks returning to the
+menu/firmware: R retries cleanup. A data leak alone would not keep EutherBoot's
+code mapped after returning, so that unsafe fallback is deliberately forbidden.
+Successful ExitBootServices never returns through these destructors; Linux owns
+its destination copy and subsequent memory reclamation. No handoff/bootparams
+structure or manual kernel relocation is implemented here.
 
 The loader retains a stable CString16 until the child is released/unloaded. If
-cleanup fails or image lifetime cannot be established, it deliberately retains
-that allocation rather than freeing a pointer the live image may still use.
-No callback or installed protocol points into EutherBoot. The Linux stub owns
-initrd loading, memory-map acquisition and ExitBootServices. The initial path-based
-`initrd=` interface is documented but a modern LoadFile2 provider remains planned.
-Only one initrd is supported. A UKI is a self-contained ordinary EFI entry with
-no external options; its stub implements the Linux handoff.
+image cleanup fails or its lifetime cannot be established, the options allocation
+is retained rather than freeing a pointer a live image might still use. Provider
+cleanup still runs and cannot be bypassed by that error. No automatic retry of
+StartImage or fallback to `initrd=` occurs.
 
 A generated static PID 1 independently reports Linux uname and /proc/cmdline,
 checks diagnostic arguments, then powers off. Tests use a fresh minimal initramfs,
@@ -128,11 +155,12 @@ References: [Linux EFI stub](https://docs.kernel.org/admin-guide/efi-stub.html),
 [UKI format](https://uapi-group.org/specifications/specs/unified_kernel_image/),
 [systemd random seed](https://github.com/systemd/systemd/blob/main/src/boot/random-seed.c)
 and [boot secret](https://github.com/systemd/systemd/blob/main/src/boot/boot-secret.c).
+The stub capability convention is defined in [Linux pe.h](https://github.com/torvalds/linux/blob/master/include/linux/pe.h).
 No source from those implementations was copied.
 
 ## Subsequent modules
 
-- Broader image compatibility: more kernels/stubs, a LoadFile2 initrd provider,
+- Broader image compatibility: more kernels/stubs and initrd memory limits,
   broader Secure Boot policies and cleanup fault injection.
 - Preferences: optional vendor-GUID variables with bounded versioned data, written
   only by an explicit user action. Unsupported persistence remains nonfatal.

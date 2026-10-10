@@ -8,6 +8,7 @@ mod editor;
 mod graphics;
 mod image_services;
 mod images;
+mod initrd;
 mod linux;
 mod loader;
 mod storage;

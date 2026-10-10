@@ -35,7 +35,7 @@ pub fn chainload(entry: &boot_core::config::Entry) -> Result<(), LoadError> {
         crate::images::verify(device, entry.path())
             .map_err(|s| LoadError::Target(alloc::format!("EFI target check: {s:?}")))?;
     }
-    let options = if entry.kind() == boot_core::config::EntryKind::LinuxEfi {
+    let prepared = if entry.kind() == boot_core::config::EntryKind::LinuxEfi {
         Some(
             crate::linux::prepare(device, entry)
                 .map_err(|s| LoadError::Target(alloc::format!("Linux EFI setup: {s:?}")))?,
@@ -43,13 +43,21 @@ pub fn chainload(entry: &boot_core::config::Entry) -> Result<(), LoadError> {
     } else {
         None
     };
-    launch(device, entry.path(), options)
+    launch(device, entry.path(), prepared)
 }
 
 pub fn chainload_path(device: Handle, filename: &str) -> Result<(), LoadError> {
     launch(device, filename, None)
 }
-fn launch(device: Handle, filename: &str, mut options: Option<CString16>) -> Result<(), LoadError> {
+fn launch(
+    device: Handle,
+    filename: &str,
+    prepared: Option<crate::linux::Prepared>,
+) -> Result<(), LoadError> {
+    let (mut options, payload) = match prepared {
+        Some(p) => (Some(p.options), p.initrd),
+        None => (None, None),
+    };
     let filename =
         CString16::try_from(filename).map_err(|_| LoadError::Device(Status::INVALID_PARAMETER))?;
     let mut buffer = [MaybeUninit::uninit(); 4096];
@@ -87,8 +95,17 @@ fn launch(device: Handle, filename: &str, mut options: Option<CString16>) -> Res
             options.num_bytes()
         ));
     }
-    crate::trace("CHAINLOAD_LOADED");
-    let result = crate::image_services::start(child);
+    // Register after successful image authentication, before child execution.
+    let provider = payload.map(crate::initrd::Provider::install).transpose();
+    let result = match &provider {
+        Ok(_) => {
+            crate::trace("CHAINLOAD_LOADED");
+            crate::image_services::start(child)
+        }
+        Err(s) => Err(LoadError::Target(alloc::format!("Initrd provider: {s:?}"))),
+    };
+    // Provider is dropped after the child's release/unload check, even on errors.
+
     // UEFI unloads applications on return/Exit. Do not blindly unload a stale
     // handle. A pre-entry refusal may leave the loaded image alive instead.
     match boot::test_protocol::<LoadedImage>(OpenProtocolParams {
@@ -99,7 +116,7 @@ fn launch(device: Handle, filename: &str, mut options: Option<CString16>) -> Res
         Ok(true) => {
             if let Err(e) = boot::unload_image(child) {
                 // A live image may still retain the pointer. Leak only on failed cleanup,
-                // rather than freeing referenced storage. No callback/code is installed.
+                // rather than freeing referenced storage. Provider Drop still runs.
                 core::mem::forget(options.take());
                 return Err(LoadError::Cleanup(e.status()));
             }

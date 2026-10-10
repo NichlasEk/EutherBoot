@@ -1,4 +1,4 @@
-# Validation · 2026-10-10 · Virtual Secure Boot
+# Validation · 2026-10-10 · LoadFile2 initrd delivery
 
 Host: Rust 1.99.0, QEMU 11.1.2 TCG/q35, ordinary OVMF, x86_64 UEFI target.
 This is virtual-development evidence: Linux reaches a generated diagnostic PID 1,
@@ -7,7 +7,7 @@ It is not evidence of an installed distribution or physical hardware boot.
 
 ## Shared parser and builds
 
-Twenty-four Rust tests cover menu wrap/empty state, the example and safe defaults,
+Twenty-five Rust tests cover menu wrap/empty state, the example and safe defaults,
 non-first defaults, positive timeouts, malformed TOML, unknown/duplicate fields,
 bad types/ranges/themes, duplicate IDs and case-insensitive paths, unsupported
 entry types, traversal/aliases, display controls/Unicode and resource bounds.
@@ -18,8 +18,9 @@ backup during interrupted recovery. Discovery tests reject unsafe names, truncat
 headers, drivers and wrong architectures. Selector tests cover canonical GUID
 syntax, zero/malformed/wrong-type rejection, case normalization and duplicate
 paths scoped to a selector. Draft import preserves default/timeout and roundtrips
-the selector, including clearing it back to omission. Linux tests cover typed fields, strict option bounds/conflicts, managed initrd
-composition and draft roundtrips. Both real PE32+ EFI executables build with
+the selector, including clearing it back to omission. Linux tests cover typed fields, strict option bounds/conflicts, initrd path
+validation, absence of generated initrd= options, EFI-stub version/capability
+bounds and draft roundtrips. Both real PE32+ EFI executables build with
 Cargo.lock, including the parser. The normal firmware also passes a build check
 without debug features.
 
@@ -136,7 +137,7 @@ variables. No host initramfs/root filesystem or physical disk is attached.
 
 | Cases | Count | Verified outcome |
 | --- | --- | --- |
-| EFI-stub on own and selected remote ESP | 2 | Real kernel receives managed initrd path and command line, reaches diagnostic PID 1 and powers off |
+| EFI-stub on own and selected remote ESP | 2 | Real kernel requests/copies LoadFile2 initrd, receives configured command line, reaches diagnostic PID 1 and powers off |
 | UKI on own and selected remote ESP, read-only disk | 2 | Embedded kernel, command line and initrd reach diagnostic PID 1 without external options |
 | UKI on writable disk | 1 | PID 1 reached; systemd stub creates two 32-byte seed files; existing EFI files and other partition retain exact hashes |
 | Missing initrd, non-Linux EFI application as linux-efi | 2 | Rejected before LoadImage; menu retained; explicitly selected recovery child starts and returns |
@@ -144,12 +145,16 @@ variables. No host initramfs/root filesystem or physical disk is attached.
 
 The oracle is independent guest PID 1 output on the serial console: uname,
 /proc/cmdline, the expected mode and owner-controlled diagnostic argument, then
-poweroff. A LoadImage marker alone does not count as a Linux boot. Remote tests
+poweroff. EFI-stub cases additionally require INITRD_INSTALLED, INITRD_SIZE_QUERY
+and INITRD_COPIED, and reject any initrd= argument in serial output. A LoadImage
+marker alone does not count as a Linux boot. Remote tests
 put invalid payloads at identical paths on the own ESP and require the selected
 remote kernel/UKI to reach PID 1 after timeout. Ordinary EFI/UKI entries have no
 LoadOptions set by EutherBoot.
 
-EFI-stub and negative cases compare the whole writable disk hash. Editor saves
+The editor fixture removes the original initrd path and saves the renamed path,
+so reaching PID 1 requires the edited selection. EFI-stub and negative cases
+compare the whole writable disk hash. Editor saves
 verify exact TOML, original backup and an unchanged disk on the second boot.
 Read-only UKI disks also retain their whole-disk hashes. The writable UKI exception
 is explicit: systemd-stub creates `loader/random-seed` and
@@ -209,19 +214,54 @@ stores remain temporary and are removed after each test. The 640×480 graphical
 refusal and text-mode refusal were visually checked for legible diagnostics and
 usable navigation.
 
-Current-build regression checks: 24 Rust tests, config validation, EFI builds,
-format checking, no-debug firmware check, normal-OVMF ExitData return and read-only
-editor failure all pass. Logs: `artifacts/secureboot-build.log` and
-`artifacts/secureboot-normal-regression.log`. The broader 48-case normal OVMF and
-9-case unsigned Linux matrices above were last fully exercised at commit
-`2f500fe`; this change adds diagnostic tracing and Secure Boot fixture coverage.
+## LoadFile2 protocol and lifetime matrix
+
+`./scripts/build.sh`, `./scripts/build-faults.sh`, then
+`python3 scripts/test-initrd.py` exercises **8 additional QEMU cases**:
+
+| Cases | Count | Verified outcome |
+| --- | --- | --- |
+| Returning consumer, both resolutions | 2 | Null arguments, unsupported boot policy/path, size query, unchanged undersized buffer, exact/oversized copies with byte hashes and trailing canaries; three starts/returns |
+| Partial protocol installation failure | 1 | Injected failure after DevicePath registration rolls back, unloads the unstarted child and retains the menu |
+| Cleanup refusal, both resolutions | 2 | Injected removal error retains provider/code; Esc/Enter cannot leave; explicit R retries and restores menu |
+| EFI-stub v0 capability | 1 | Rejected before LoadImage; no path-based fallback |
+| Empty initrd | 1 | Rejected before registration/LoadImage |
+| No initrd configured | 1 | Child starts without an installed initrd provider |
+
+The consumer is TestChild code with moved PE headers/file offsets and synthetic
+Linux HdrS/EFI-stub identification fields. It is an EFI protocol fixture, **not**
+a Linux boot result. Its 4097-byte deterministic payload is checked independently
+using byte count/FNV and canaries. Each case makes three explicit attempts and
+alternates with an ordinary EFI child that independently locates the Linux initrd
+path and requires it to be absent. Final attempts also exercise nonempty ExitData.
+All eight writable GPT/FAT disks retain their complete pre-run SHA-256 hashes.
+
+The fault artifact alone reads initrd-fault. `install` simulates a failed second
+protocol registration; `cleanup` reports ACCESS_DENIED once per provider before
+calling real removal on the explicit retry. These are controlled branch tests,
+not evidence that OVMF naturally refuses these operations. Normal-OVMF kernel
+boots use the production artifact, not fault hooks. Logs/screenshots/results:
+`artifacts/initrd-<case>-<width>x<height>/`; combined log:
+`artifacts/initrd-regression.log`. Cleanup-blocked and restored-menu captures at
+640×480 were visually checked.
+
+Current-build checks: 25 Rust tests, config validation, real EFI builds, formatting,
+no-debug firmware check, all 48 normal OVMF cases, 9 real Linux cases, 3 Secure Boot
+VMs and these 8 protocol cases (**68 QEMU cases total**). Logs are
+`artifacts/efi-regression.log`, `artifacts/linux-regression.log`,
+`artifacts/secureboot-matrix.log` and `artifacts/initrd-regression.log`.
 
 ## Limits
 
 No installed distribution, physical machine, production Secure Boot trust store,
 multiple physical disks or hot-plug behavior has been demonstrated. Linux tests
-use one kernel version, one systemd stub and a diagnostic initramfs. A LoadFile2
-initrd provider, multiple initrds and arbitrary non-EFI kernel loading are absent. Multiple ESPs on a virtual GPT disk are covered.
+use one kernel version, one systemd stub and a diagnostic initramfs. Multiple
+initrds and arbitrary non-EFI kernel loading are absent. LoadFile2 does not
+authenticate external initrds or command lines. A pre-existing provider is rejected
+by policy, but the foreign-provider collision branch is not yet integration-tested.
+Initrd allocation exhaustion, mid-read I/O errors/file growth and genuine firmware
+removal refusal are not injected; partial registration and synthetic removal
+refusal are covered. An unrecoverable removal failure requires power-off. Multiple ESPs on a virtual GPT disk are covered.
 Editor preferences persist in TOML; NVRAM preferences are not implemented.
 The editor cannot create the first configuration or repair raw malformed TOML;
 a valid backup can be restored explicitly. FAT rename is not power-loss atomic. Input is polled; the timeout itself uses a
@@ -239,9 +279,12 @@ verification. Import with an invalid live config or pending transaction is block
 these import-specific refusal branches have not been separately fault-injected.
 See ARCHITECTURE.md for loader cleanup and self-copy limitations.
 
-Artifact SHA-256 for this build:
+Artifact SHA-256 for the validated build (PE timestamps change on relink).
+The final source relink differs only in COFF/debug-directory timestamp fields;
+`artifacts/loadfile2-relink-check.txt` records that comparison. The tested artifact
+is retained:
 
 ```text
-28137a1247ef2b4510afe65b4741beebe1570565e6b1fcbaba4cec91f739054f  artifacts/EutherBoot.efi
-0072e7421bcd7370ccc6e8b2725bc4dcfe8518bb4c4f95f6d9b696087b82106d  artifacts/TestChild.efi
+e5aeba5e876682fdc3648e09fbeb06eea260aae1ddac5b15c19fe0fbcfc38b63  artifacts/EutherBoot.efi
+c8b2aa005a71407c6d9f805e9f19c83e5a47adf3d42f009d075744e1992f0b90  artifacts/TestChild.efi
 ```

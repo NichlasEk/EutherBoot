@@ -6,3 +6,4 @@ publish = false
 
 [dependencies]
 uefi = { version = "0.40", features = ["panic_handler", "alloc", "global_allocator"] }
+uefi-raw = "0.16"

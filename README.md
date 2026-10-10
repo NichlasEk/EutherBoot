@@ -30,7 +30,7 @@ isolated rustup installation under `.tools/` without changing the host compiler.
 ./scripts/build.sh
 python3 scripts/qemu.py                 # interactive window
 ./scripts/validate-config.sh eutherboot.toml
-./scripts/test.sh                       # 24 Rust tests + 48 OVMF cases
+./scripts/test.sh                       # 25 Rust tests + 48 OVMF cases
 ```
 
 Override `OVMF_CODE` and `OVMF_VARS` if needed. Defaults are Arch Linux's
@@ -153,9 +153,21 @@ it must be a readable, nonempty regular file no larger than 128 MiB. Explicit
 The composed options must fit the kernel header's command-line capacity.
 
 EutherBoot checks the PE application and Linux boot headers, then supplies UCS-2
-LoadOptions with the documented `initrd=` EFI-stub option. Linux loads the initrd
-and handles ExitBootServices. This is not support for arbitrary ELF kernels or
-GRUB's Linux loading protocol. A LoadFile2 initrd provider remains future work.
+LoadOptions containing only the configured command line. An initrd is read fully
+from the selected ESP before launch and exposed through the Linux **LoadFile2**
+device path. Linux chooses its destination buffer and handles ExitBootServices.
+There is no generated `initrd=` argument and no silent path-based fallback.
+An initrd requires EFI-stub v1/v2 or the LoadFile2 capability bit in v3+; kernels
+without that capability are rejected before LoadImage. This is not support for
+arbitrary ELF kernels or GRUB's Linux loading protocol.
+
+A pre-existing Linux initrd provider blocks a linux-efi launch, even when the
+entry has no initrd, to avoid consuming an unrelated source. Returning children
+are unloaded/released before the temporary provider is removed. If firmware
+refuses removal, boot/firmware return remains blocked: R explicitly retries
+cleanup, or the user can power off. This prevents unloading live callback code.
+The initrd snapshot requires up to 128 MiB of extra boot-manager memory, in addition
+to the kernel's destination allocation; external initrd data is not authenticated.
 
 A **UKI uses `type = "efi"`** and its embedded kernel, command line and initrd.
 Ordinary EFI entries reject external `cmdline`/`initrd` fields. Discovery imports
@@ -181,6 +193,26 @@ An EFI child controls its own side effects. The tested systemd stub creates
 case records those writes and verifies existing EFI files and the other partition
 remain unchanged; normal UKI cases use a read-only virtual disk. This is not an
 EutherBoot disk-write policy imposed on the child.
+
+## LoadFile2 lifecycle tests
+
+```sh
+./scripts/build.sh
+./scripts/build-faults.sh
+python3 scripts/test-initrd.py
+```
+
+Eight additional QEMU cases use a synthetic EFI application with Linux-identifying
+headers and unchanged test-child code. This is a returning protocol consumer,
+not evidence of a Linux boot. It checks null/invalid arguments, boot policy,
+size queries, undersized buffers, exact/repeated copies and trailing canaries.
+Three repeated launches alternate with a plain EFI child that independently
+confirms no initrd provider remains. Old-stub capability, empty/no-initrd cases,
+partial registration failure and cleanup refusal/retry are exercised. The separate
+fault artifact alone reads `initrd-fault`; normal firmware never reads that file.
+Logs, screenshots and disk hashes are under `artifacts/initrd-*`.
+The Linux matrix above independently proves actual kernel/userspace boot through
+LoadFile2, including remote ESP selection and edited initrd paths after reboot.
 
 ## Secure Boot tests
 
