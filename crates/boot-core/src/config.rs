@@ -21,6 +21,7 @@ pub struct Entry {
     id: String,
     name: String,
     path: String,
+    partition_guid: Option<String>,
 }
 impl Entry {
     pub fn id(&self) -> &str {
@@ -28,6 +29,9 @@ impl Entry {
     }
     pub fn name(&self) -> &str {
         &self.name
+    }
+    pub fn partition_guid(&self) -> Option<&str> {
+        self.partition_guid.as_deref()
     }
     pub fn path(&self) -> &str {
         &self.path
@@ -73,6 +77,20 @@ struct RawEntry {
     #[serde(rename = "type")]
     kind: String,
     path: Option<String>,
+    partition_guid: Option<String>,
+}
+
+/// Canonical GPT unique-partition GUID syntax; not a filesystem UUID or type GUID.
+pub fn valid_partition_guid(value: &str) -> bool {
+    value.len() == 36
+        && value.bytes().enumerate().all(|(i, b)| {
+            if [8, 13, 18, 23].contains(&i) {
+                b == b'-'
+            } else {
+                b.is_ascii_hexdigit()
+            }
+        })
+        && value.bytes().any(|b| b.is_ascii_hexdigit() && b != b'0')
 }
 
 /// Deliberately restricted to unambiguous ASCII FAT paths in this milestone.
@@ -159,13 +177,26 @@ pub fn parse(source: &str) -> Result<Config, String> {
         if entries.iter().any(|v| v.id == e.id) {
             return Err(fail("duplicate id"));
         }
-        if entries.iter().any(|v| v.path.eq_ignore_ascii_case(&path)) {
-            return Err(fail("duplicate EFI path"));
+        let partition_guid = match e.partition_guid {
+            Some(guid) if valid_partition_guid(&guid) => Some(guid.to_ascii_lowercase()),
+            Some(_) => {
+                return Err(fail(
+                    "partition_guid must be a nonzero 8-4-4-4-12 hexadecimal GUID",
+                ));
+            }
+            None => None,
+        };
+        if entries
+            .iter()
+            .any(|v| v.partition_guid == partition_guid && v.path.eq_ignore_ascii_case(&path))
+        {
+            return Err(fail("duplicate EFI path on the same partition selector"));
         }
         entries.push(Entry {
             id: e.id,
             name: e.name,
             path,
+            partition_guid,
         });
     }
     let default_index = entries
@@ -237,6 +268,32 @@ mod tests {
             "\\efi\\eutherboot\\testchild.EFI",
         );
         assert!(parse(&format!("{BASE}{extra}")).is_err());
+    }
+    #[test]
+    fn partition_identity_is_strict_and_paths_are_volume_scoped() {
+        let guid = "aabbccdd-1234-5678-9012-aabbccddeeff";
+        let extra = format!(
+            "\n[[entry]]\nid='other'\nname='Other'\ntype='efi'\npath='\\EFI\\EutherBoot\\TestChild.efi'\npartition_guid='{guid}'\n"
+        );
+        let parsed = parse(&format!("{BASE}{extra}")).unwrap();
+        assert_eq!(parsed.entries()[0].partition_guid(), None);
+        assert_eq!(parsed.entries()[1].partition_guid(), Some(guid));
+        let qualified = format!("{BASE}\npartition_guid='{}'\n", guid.to_ascii_uppercase());
+        assert_eq!(
+            parse(&qualified).unwrap().entries()[0].partition_guid(),
+            Some(guid)
+        );
+        assert!(parse(&format!("{qualified}{extra}")).is_err());
+        for value in [
+            "",
+            "00000000-0000-0000-0000-000000000000",
+            "aabbccdd123456789012aabbccddeeff",
+            "aabbccdd-1234-5678-9012-aabbccddeefg",
+            " aabbccdd-1234-5678-9012-aabbccddeeff",
+        ] {
+            assert!(parse(&format!("{BASE}\npartition_guid='{value}'")).is_err());
+        }
+        assert!(parse(&format!("{BASE}\npartition_guid=123")).is_err());
     }
     #[test]
     fn paths_never_escape_volume_or_use_ambiguous_aliases() {

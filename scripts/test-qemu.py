@@ -23,6 +23,10 @@ discovery = script.with_name("discovery-qemu.py")
 cases += [(discovery,["--case",case]) for case in ("multiple","duplicate","empty","limit","failure","bad-config")]
 cases += [(discovery,["--case","multiple","--width","640","--height","480"])]
 
+cross_volume = script.with_name("cross-volume-qemu.py")
+cases += [(cross_volume,["--case",case]) for case in ("save","discard","missing","duplicate","non-esp","alias","self","self-copy","same-path-self","missing-file")]
+cases += [(cross_volume,["--case","save","--width","640","--height","480"])]
+
 def run(case):
     program, args = case
     with subprocess.Popen([sys.executable,str(program),*args],

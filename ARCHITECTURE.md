@@ -27,14 +27,18 @@ The typed Config and Entry have private fields and are only constructed by the
 shared parser. Boot settings deny unknown fields; default is mandatory, timeout
 is optional/zero, theme optional/system-regis (text is also supported). Entries require id, name, type and
 path. Only EFI entries are implemented. IDs are unique; case-insensitive EFI paths
-are also unique. No arbitrary default or partially accepted list is produced.
+are unique within a partition selector. The optional nonzero partition_guid is
+normalized to lowercase; omission means the current volume. No arbitrary default
+or partially accepted list is produced.
 See README for input, display and path bounds. Error messages include TOML line
 numbers where available, omit control characters and cap parser text length.
 
 Firmware additionally compares every target to the loaded application's own
-path, case-insensitively, rejecting a direct self-reference. This is not a binary
-identity check: a renamed copy of EutherBoot could still recurse. The separate discovery browser additionally excludes exact binary copies;
-configured entries retain the existing path-only check. Host validation cannot
+path and volume, rejecting direct self-reference. It also rejects implicit-own and
+explicit-own-GUID duplicate targets. GUID-qualified launches and discovery exclude
+exact binary copies through the shared `images` module. Legacy unqualified entries
+retain their path-only check; different builds or modified binaries can still
+recurse. Host validation cannot
 verify this runtime identity or prove that any configured file exists.
 
 A configuration error disables all configured entries and automatic boot. The
@@ -71,7 +75,7 @@ best-effort; simultaneous loss of both GOP and text output is unresolved.
 ## EFI image lifecycle
 
 `loader` builds a full device path from an explicit volume handle and file path
-(the application's own device for configured entries), in a bounded 4096-byte buffer. It calls LoadImage/ExactMatch
+(the application's own device for entries without partition_guid), in a bounded 4096-byte buffer. It calls LoadImage/ExactMatch
 and StartImage with no borrowed protocols or graphics buffers held across transfer.
 This is EFI chainloading, not arbitrary Linux-kernel loading. No command lines,
 initrds or ExitBootServices handoff are implemented.
@@ -93,8 +97,8 @@ exits boot services cannot be recovered by this menu.
 
 ## Subsequent modules
 
-- Persisted cross-volume targets: explicit partition-GUID schema/editor support,
-  with ambiguity handling on each boot. Discovery currently stays session-only.
+- Broader image compatibility: Linux EFI-stub/UKI tests, command-line/initrd
+  handling and maintained-crate fixes for image lifecycle limitations.
 - Preferences: optional vendor-GUID variables with bounded versioned data, written
   only by an explicit user action. Unsupported persistence remains nonfatal.
 - Linux/UKI: separate command-line, initrd, memory-map and handoff logic, tested
@@ -230,7 +234,8 @@ cannot be read. Directory records use an aligned fixed 1024-byte buffer. Paths
 are bounded printable ASCII without traversal/control characters; unsupported
 names are skipped. Depth, record, target and 64 MiB read budgets limit scanning;
 partial results are clearly labelled. Firmware calls themselves have no watchdog.
-See README for all caps. Candidate promotion to persisted TOML is not implemented.
+See README for all caps. Candidate promotion goes through an explicit unsaved
+editor draft; the scanner itself never persists a selection.
 
 Discovery tests use two ESPs and one non-ESP FAT partition on a temporary GPT disk.
 The independent child reports its actual LoadedImage device's partition GUID,
@@ -238,3 +243,40 @@ proving which volume supplied identical paths. Read/write-enabled virtual disks
 are hashed in full before/after the session to check absence of writes, rather
 than merely relying on a read-only QEMU drive setting. Secure Boot, real operating
 systems and hardware remain separate gates.
+
+
+## Persisted cross-volume targets
+
+Entry.partition_guid is an optional validated canonical string, not a firmware
+handle, partition number or device-path snapshot. Drafts keep its raw text until
+validation; blank draft text serializes as omission, while explicitly empty TOML
+is rejected. Serialization roundtrips GUIDs and retains omitted selectors.
+The core duplicate key is (partition selector, case-insensitive path). Runtime
+validation additionally recognizes aliases of the current ESP's own GUID. No
+availability check is needed to edit or restore a structurally valid offline entry.
+
+`volumes` centralizes the read-only protocol borrows and GPT ESP eligibility shared
+with discovery. `resolve` enumerates at most 32 filesystem handles on each requested
+qualified launch, examines all eligible identities, and returns a handle only for
+one unique match. Enumeration/identity errors fail closed. There is no preference
+for the current volume, disk order or first match. Unsupported non-ESP handles
+are skipped. The default selector is preflighted before a positive timer is armed;
+resolution failure disables that timer and shows the error in text mode. Other
+entries remain selectable. The same resolver runs again at activation, so the
+startup check is not a persistent handle cache.
+
+`images` contains the bounded classifier and exact-copy check extracted from
+discovery. GUID-qualified configured targets use the same checks before the shared
+loader builds a full device path. File errors, rejected classification and firmware
+LoadImage/StartImage failure do not select another target or rearm the timer.
+This remains ordinary EFI chainloading; header recognition is not OS compatibility,
+cryptographic identity or protection against hot-plug/concurrent filesystem changes.
+
+Discovery A (or Enter in the editor's I picker) shows full GUID/path and asks Y
+before returning an in-memory Selection. Import copies only the selector/path,
+generates a collision-free entry ID and a reviewable name, and preserves default
+and timeout. U edits/clears the selector on any draft entry. No discovery or picker
+protocol handle survives the return to the editor. Import requires a valid live
+config and no pending transaction, respects 16-entry/path bounds, and never writes
+or launches. The existing S/Y transaction stores the draft and exact previous
+backup on the own volume. Import cancellation/discard leaves all volumes unchanged.

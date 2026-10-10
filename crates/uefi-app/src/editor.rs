@@ -99,14 +99,22 @@ fn show(draft: Option<&Draft>, selected: usize, editing: bool, message: &str) {
             );
         }
         if let Some(e) = d.entries.get(selected) {
-            uefi::println!("\nPath: {}", e.path);
+            uefi::println!(
+                "\nPath: {}\nPartition: {}",
+                e.path,
+                if e.partition_guid.is_empty() {
+                    "own volume"
+                } else {
+                    &e.partition_guid
+                }
+            );
         }
     } else {
         uefi::println!("No valid live configuration. Recovery or external repair required.");
     }
     if editing {
         uefi::println!(
-            "\nD default | T timeout | G appearance | A add | R remove\nN name | P path | V validate | F5 preview | S save | Esc discard"
+            "\nD default | T timeout | G appearance | A add | R remove\nN name | P path | U partition | I import | V validate\nF5 preview | S save | Esc discard"
         );
     } else {
         uefi::println!(
@@ -143,6 +151,9 @@ fn preview(d: &Draft) -> Result<(), String> {
 }
 /// True means reload disk state without arming automatic boot.
 pub fn run() -> bool {
+    run_import(None)
+}
+pub fn run_import(import: Option<crate::discovery::Selection>) -> bool {
     trace("EDITOR_OPEN");
     let mut store = match UefiStore::open() {
         Ok(s) => s,
@@ -160,6 +171,27 @@ pub fn run() -> bool {
     let mut selected = 0;
     let mut reload = false;
     let mut message = String::from("Inspection does not write to disk.");
+    if let Some(target) = import {
+        if let Some(d) = draft
+            .as_mut()
+            .filter(|_| matches!(transaction::pending(&mut store), Ok(false)))
+        {
+            match d.import_target(&target.partition_guid, &target.path) {
+                Ok(index) => {
+                    selected = index;
+                    editing = true;
+                    message =
+                        "Imported to draft only. Default/timeout unchanged; S asks to save.".into();
+                    trace("EDITOR_IMPORTED");
+                }
+                Err(e) => message = e,
+            }
+        } else {
+            message =
+                "Import requires a valid live config and no unfinished save. Use recovery first."
+                    .into();
+        }
+    }
     loop {
         show(draft.as_ref(), selected, editing, &message);
         let Some(k) = key() else { return false };
@@ -168,7 +200,7 @@ pub fn run() -> bool {
                 if !editing
                     || confirm(
                         "Discard this draft?",
-                        "The live configuration has not been changed.",
+                        "Unsaved draft changes will be lost. Any earlier disk-write attempt is not undone.",
                     )
                 {
                     trace("EDITOR_DISCARD");
@@ -298,7 +330,12 @@ pub fn run() -> bool {
                         if let Some(id) = prompt("id", "", 32) {
                             if let Some(name) = prompt("name", "", 48) {
                                 if let Some(path) = prompt("path", "\\EFI\\", 240) {
-                                    d.entries.push(DraftEntry { id, name, path });
+                                    d.entries.push(DraftEntry {
+                                        id,
+                                        name,
+                                        path,
+                                        partition_guid: String::new(),
+                                    });
                                     selected = d.entries.len() - 1;
                                 }
                             }
@@ -329,6 +366,29 @@ pub fn run() -> bool {
                         if let Some(e) = d.entries.get_mut(selected) {
                             if let Some(v) = prompt("path", &e.path, 240) {
                                 e.path = v;
+                            }
+                        }
+                    }
+                    'u' => {
+                        if let Some(e) = d.entries.get_mut(selected) {
+                            if let Some(v) =
+                                prompt("partition_guid (empty = own volume)", &e.partition_guid, 36)
+                            {
+                                e.partition_guid = v;
+                            }
+                        }
+                    }
+                    'i' => {
+                        if let Some(target) = crate::discovery::pick() {
+                            match d.import_target(&target.partition_guid, &target.path) {
+                                Ok(index) => {
+                                    selected = index;
+                                    message =
+                                        "Imported to draft only. Default and timeout unchanged."
+                                            .into();
+                                    trace("EDITOR_IMPORTED");
+                                }
+                                Err(e) => message = e,
                             }
                         }
                     }

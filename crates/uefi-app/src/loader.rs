@@ -16,19 +16,26 @@ use uefi::{
 #[derive(Debug)]
 pub enum LoadError {
     Device(Status),
+    Target(alloc::string::String),
     PathTooLong,
     Load(Status),
     Start(Status),
     Cleanup(Status),
 }
 
-/// No discovery, ambiguous volume selection, automatic retry or persistent writes.
+/// Every explicit partition selector is resolved anew. No fallback to our own volume.
+pub fn entry_device(entry: &boot_core::config::Entry) -> Result<Handle, LoadError> {
+    match entry.partition_guid() {
+        Some(guid) => crate::volumes::resolve(guid).map_err(LoadError::Target),
+        None => crate::volumes::own_device().map_err(LoadError::Device),
+    }
+}
 pub fn chainload(entry: &boot_core::config::Entry) -> Result<(), LoadError> {
-    let device = {
-        let image = boot::open_protocol_exclusive::<LoadedImage>(boot::image_handle())
-            .map_err(|e| LoadError::Device(e.status()))?;
-        image.device().ok_or(LoadError::Device(Status::NOT_FOUND))?
-    };
+    let device = entry_device(entry)?;
+    if entry.partition_guid().is_some() {
+        crate::images::verify(device, entry.path())
+            .map_err(|s| LoadError::Target(alloc::format!("EFI target check: {s:?}")))?;
+    }
     chainload_path(device, entry.path())
 }
 
@@ -84,6 +91,7 @@ pub fn chainload_path(device: Handle, filename: &str) -> Result<(), LoadError> {
 impl LoadError {
     pub fn notice(&self) -> alloc::string::String {
         let (stage, status) = match self {
+            Self::Target(message) => return alloc::format!("{message}. Menu retained."),
             Self::Device(s) => ("Device", *s),
             Self::PathTooLong => ("Device path", Status::BAD_BUFFER_SIZE),
             Self::Load(s) => ("LoadImage", *s),

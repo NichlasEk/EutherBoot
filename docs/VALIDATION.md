@@ -1,11 +1,11 @@
-# Validation · 2026-10-10 · Multi-ESP discovery
+# Validation · 2026-10-10 · Persisted GPT targets
 
 Host: Rust 1.99.0, QEMU 11.1.2 TCG/q35, ordinary OVMF, x86_64 UEFI target.
 This is virtual-development evidence, not physical hardware or OS boot evidence.
 
 ## Shared parser and builds
 
-Nineteen Rust tests cover menu wrap/empty state, the example and safe defaults,
+Twenty-one Rust tests cover menu wrap/empty state, the example and safe defaults,
 non-first defaults, positive timeouts, malformed TOML, unknown/duplicate fields,
 bad types/ranges/themes, duplicate IDs and case-insensitive paths, unsupported
 entry types, traversal/aliases, display controls/Unicode and resource bounds.
@@ -13,13 +13,16 @@ The host CLI validates the same example with the same no_std parser as firmware.
 Draft tests cover isolation, serialization and validation. Transaction tests inject
 failed mutations and corrupt readback, reject stale drafts, and preserve a valid
 backup during interrupted recovery. Discovery tests reject unsafe names, truncated
-headers, drivers and wrong architectures. Both real PE32+ EFI executables build with
+headers, drivers and wrong architectures. Selector tests cover canonical GUID
+syntax, zero/malformed/wrong-type rejection, case normalization and duplicate
+paths scoped to a selector. Draft import preserves default/timeout and roundtrips
+the selector, including clearing it back to omission. Both real PE32+ EFI executables build with
 Cargo.lock, including the parser. The normal firmware also passes a build check
 without debug features.
 
 ## OVMF matrix
 
-`./scripts/test.sh` builds/tests and runs **36 independent QEMU cases**. Each has
+`./scripts/test.sh` builds/tests and runs **47 independent QEMU cases**. Each has
 its own disposable FAT filesystem and firmware-variable copy, with no attached
 host disks or networking. Editor tests use a real virtual GPT/FAT disk image. At most three VMs run concurrently. Test steps have
 deadlines; an outer timeout interrupts the runner/VM process group.
@@ -42,12 +45,18 @@ deadlines; an outer timeout interrupts the runner/VM process group.
 | Invalid editor draft | 1 | Self-reference and missing default rejected; explicit default repair validates |
 | Read-only disk | 1 | Save reports WRITE_PROTECTED; original unchanged |
 | Interrupted save at three checkpoints | 3 | Kill after staging, backup or install; next boot blocks automatic selection; explicit recovery succeeds |
-| Multi-ESP discovery at both resolutions | 2 | Same path on two ESPs launches from the selected volume, proven by child-reported GUID; data partition and self-copies excluded |
+| Persisted GPT targets at both resolutions | 2 | Same path on two ESPs launches from the selected volume, proven by child-reported GUID; data partition and self-copies excluded |
 | Duplicate GPT GUIDs | 1 | All ambiguous ESPs excluded; no targets promoted |
 | Empty discovery | 1 | Only self/non-application files present; empty menu remains usable |
 | Discovery candidate limit | 1 | 64-target cap is visible as partial; pagination reaches last entry |
 | Classified but unloadable image | 1 | Firmware LoadImage rejects malformed section extent; browser retained and another target can start |
 | Discovery after malformed TOML | 1 | Configured targets/timer remain disabled; separately confirmed discovered target boots |
+| Persisted import at both resolutions | 2 | F4/A import, explicit save, exact backup, manual remote boot and timed reboot with reversed ESP positions |
+| Editor picker / discard | 1 | F3/E/I import, duplicate rejection, GUID editing/clearing, preview, cancelled save and discard leave entire disk unchanged |
+| Missing GUID, duplicate GUID, non-ESP selector | 3 | Default preflight disables timer; manual attempt fails without fallback; explicit own-volume entry remains usable |
+| Implicit/explicit own-volume alias, qualified self-path | 2 | Entire config rejected; no target or timer enabled |
+| Exact remote self-copy, missing remote file | 2 | Single automatic attempt fails before LoadImage; no fallback/retry; own entry can still be selected manually |
+| Own boot path on another ESP | 1 | Same pathname as EutherBoot itself but a different GUID correctly starts the remote child |
 
 The original five chainload cases each perform three explicit attempts in one
 VM, including text mode. Positive configuration cases move the child away from
@@ -79,8 +88,8 @@ same image. These are controlled interruption tests, not proof against torn
 sectors or all physical power-loss behavior. No host boot configuration or
 firmware variables were modified by EutherBoot.
 
-The full 36-case suite is exercised by `./scripts/test.sh`; its combined run log
-is `artifacts/discovery-regression.log`. Discovery uses two ESPs and one non-ESP
+The full 47-case suite is exercised by `./scripts/test.sh`; its combined run log
+is `artifacts/cross-volume-regression.log`. Discovery uses two ESPs and one non-ESP
 FAT partition on one generated GPT disk. Fixtures include identical paths,
 a renamed EutherBoot binary on the second ESP, invalid PE data, an AArch64 image,
 and an EFI driver. Only eligible targets appear. Enter/cancel does not load an
@@ -94,6 +103,24 @@ debug/serial/QEMU logs, PPM screenshots and a result file with the identical
 before/after SHA-256 of the entire writable virtual disk. No disk differences
 were observed in these tests. The 640×480 browser and confirmation were visually
 inspected for readable identity, path and keyboard controls.
+
+Persisted-selector evidence lives under
+`artifacts/cross-volume-<case>-<width>x<height>/`. Save cases export actual saved
+TOML and exact backup bytes. After saving, the generated disk is rebuilt with
+the exact saved configuration and reversed ESP partition positions; fresh OVMF
+variables are used. The next boot resolves the GUID at its new device path and
+automatically starts the correct child once. This proves resolution survives
+changed virtual partition positions, not physical hot-plug behavior.
+
+All cross-volume cases hash the other two complete FAT partitions before and
+after the session. No differences are allowed, including when configuration is
+saved on the own ESP. Cases that do not save additionally compare the whole
+writable disk hash. Save verification includes default/timeout, omitted own-volume
+selector, explicit remote GUID/path, exact old backup and absence of sidecars.
+The reordered disk is also unchanged after booting/returning. Child-reported
+GUIDs distinguish remote success from accidental own-volume fallback. Imported
+drafts were visually inspected at 1024×768 and 640×480: full GUID, path, unchanged
+boot policy and editing/saving controls remain readable.
 
 ## Limits
 
@@ -110,13 +137,16 @@ Directory-backed FAT, single-ESP GPT and multiple-ESP GPT are exercised. MBR,
 superfloppy and firmware lacking PartitionInfo remain unsupported for discovery.
 The target-count limit is exercised; exhaustive directory/depth/read-budget and
 I/O fault injection is still outstanding. Exact copies of the current on-disk
-binary are excluded; different builds/signed copies are not. Persisting discovered
-cross-volume choices in TOML is not implemented.
+binary are excluded for discovery/GUID-qualified launches; different builds/signed
+copies are not. Legacy unqualified entries retain the path-only self check.
+A valid but absent selector may be saved; validation is not availability or trust
+verification. Import with an invalid live config or pending transaction is blocked;
+these import-specific refusal branches have not been separately fault-injected.
 See ARCHITECTURE.md for loader cleanup and self-copy limitations.
 
 Artifact SHA-256 for this build:
 
 ```text
-02135ee849366b9fe572a5c873e85f9337786e5b4272dab5cef0afa9843cc119  artifacts/EutherBoot.efi
+60ba30cde246967654490d01615e6c8bf3b729d2f6dc4c77532ca2032efdc5a6  artifacts/EutherBoot.efi
 788bc2acd5f2bf3e228885be1f91a29e84df53b5843546d7987c72918989c1f8  artifacts/TestChild.efi
 ```

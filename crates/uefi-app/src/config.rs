@@ -64,12 +64,23 @@ pub fn validate(bytes: &[u8]) -> Result<Config, String> {
     let source = core::str::from_utf8(bytes).map_err(|_| String::from("Config is not UTF-8"))?;
     let config = config::parse(source)?;
     let own = own_path().map_err(|s| format!("Cannot verify own EFI path: {s:?}"))?;
-    if config
-        .entries()
-        .iter()
-        .any(|e| e.path().eq_ignore_ascii_case(&own))
-    {
-        return Err("Configuration points to EutherBoot itself".into());
+    let own_guid = crate::volumes::own_guid();
+    let on_own_volume = |e: &boot_core::config::Entry| {
+        e.partition_guid().is_none() || e.partition_guid() == own_guid.as_deref()
+    };
+    for (i, entry) in config.entries().iter().enumerate() {
+        if on_own_volume(entry) && entry.path().eq_ignore_ascii_case(&own) {
+            return Err("Configuration points to EutherBoot itself".into());
+        }
+        if on_own_volume(entry)
+            && config.entries()[..i].iter().any(|previous| {
+                on_own_volume(previous) && previous.path().eq_ignore_ascii_case(entry.path())
+            })
+        {
+            return Err(
+                "Duplicate EFI target: own volume and explicit GUID refer to the same path".into(),
+            );
+        }
     }
     Ok(config)
 }

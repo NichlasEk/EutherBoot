@@ -6,9 +6,11 @@ mod config;
 mod discovery;
 mod editor;
 mod graphics;
+mod images;
 mod loader;
 mod storage;
 mod timeout;
+mod volumes;
 use alloc::{format, string::String, vec::Vec};
 use boot_core::Menu;
 use uefi::{
@@ -92,8 +94,23 @@ fn session(allow_timeout: bool) -> Option<Status> {
     let mut menu = Menu {
         selected: config.as_ref().map(|c| c.default_index()).unwrap_or(0),
     };
-    let seconds = config.as_ref().map(|c| c.timeout()).unwrap_or(0);
-    let mut notice = diagnostic.clone().unwrap_or_else(|| {
+    let mut seconds = config.as_ref().map(|c| c.timeout()).unwrap_or(0);
+    let target_diagnostic = if allow_timeout && seconds > 0 {
+        config.as_ref().and_then(|c| {
+            let entry = &c.entries()[c.default_index()];
+            entry.partition_guid()?;
+            loader::entry_device(entry).err().map(|e| {
+                seconds = 0;
+                let message = format!("{} Automatic boot disabled.", e.notice());
+                trace(&format!("DEFAULT_UNAVAILABLE {message}"));
+                message
+            })
+        })
+    } else {
+        None
+    };
+    let default_unavailable = target_diagnostic.is_some();
+    let mut notice = diagnostic.clone().or(target_diagnostic).unwrap_or_else(|| {
         if seconds == 0 || !allow_timeout {
             String::from("No automatic boot. Select an entry and press Enter.")
         } else {
@@ -104,7 +121,9 @@ fn session(allow_timeout: bool) -> Option<Status> {
         &labels,
         &menu,
         &notice,
-        diagnostic.is_some() || config.as_ref().is_some_and(|c| c.theme() == "text"),
+        diagnostic.is_some()
+            || default_unavailable
+            || config.as_ref().is_some_and(|c| c.theme() == "text"),
     );
     // Start the deadline only after the menu is visible. Never arm it again
     // following a key, configuration error, load error, or returning child.
@@ -155,7 +174,11 @@ fn session(allow_timeout: bool) -> Option<Status> {
                     return Some(Status::SUCCESS);
                 }
                 Key::Special(ScanCode::FUNCTION_4) => {
-                    discovery::run();
+                    if let Some(target) = discovery::run() {
+                        if editor::run_import(Some(target)) {
+                            return None;
+                        }
+                    }
                     notice = "Discovery closed. Automatic boot disabled.".into();
                     redraw = true;
                 }
@@ -224,7 +247,7 @@ fn session(allow_timeout: bool) -> Option<Status> {
                         "Source: \\EFI\\EutherBoot\\eutherboot.toml\n{} entries. Default: {}. Timeout: {}s.\nRead-only inspection; F3 opens the editor.",
                         entries.len(),
                         entries[config.as_ref().unwrap().default_index()].id(),
-                        seconds
+                        config.as_ref().unwrap().timeout()
                     )
                 };
                 text = render(&labels, &menu, &notice, text);

@@ -1,30 +1,31 @@
-//! Read-only, opt-in discovery. No persistent entries or automatic selection.
+//! Read-only discovery; selections can be handed to an unsaved editor draft.
 use alloc::{format, string::String, vec::Vec};
-use boot_core::{
-    Menu,
-    discovery::{is_x64_application, safe_component},
-};
+use boot_core::{Menu, discovery::safe_component};
 use uefi::{
     CString16, Guid, Handle, Status, boot,
     proto::{
-        ProtocolPointer,
         console::text::{Key, ScanCode},
         device_path::DevicePath,
-        loaded_image::LoadedImage,
         media::{
-            file::{Directory, File, FileAttribute, FileInfo, FileMode, RegularFile},
+            file::{Directory, File, FileAttribute, FileMode},
             fs::SimpleFileSystem,
-            partition::{GptPartitionAttributes, GptPartitionType, PartitionInfo},
         },
     },
     system,
 };
 
-const MAX_VOLUMES: usize = 32;
+use crate::{
+    images::{candidate, own_bytes},
+    volumes::{MAX_VOLUMES, identity, protocol},
+};
 const MAX_ENTRIES: usize = 2048;
 const MAX_TARGETS: usize = 64;
 const MAX_DEPTH: usize = 4;
 
+pub struct Selection {
+    pub partition_guid: String,
+    pub path: String,
+}
 struct Volume {
     handle: Handle,
     id: Guid,
@@ -44,125 +45,6 @@ struct Scan {
     read_budget: usize,
 }
 
-// SAFETY: callers are synchronous and never disconnect, uninstall protocols or
-// run another image while a borrow is held. GET_PROTOCOL preserves drivers.
-fn protocol<P: ProtocolPointer + ?Sized>(
-    handle: Handle,
-) -> Result<boot::ScopedProtocol<P>, Status> {
-    unsafe {
-        boot::open_protocol::<P>(
-            boot::OpenProtocolParams {
-                handle,
-                agent: boot::image_handle(),
-                controller: None,
-            },
-            boot::OpenProtocolAttributes::GetProtocol,
-        )
-    }
-    .map_err(|e| e.status())
-}
-fn identity(handle: Handle) -> Result<Guid, Status> {
-    let partition = protocol::<PartitionInfo>(handle)?;
-    let entry = partition.gpt_partition_entry().ok_or(Status::UNSUPPORTED)?;
-    let kind = entry.partition_type_guid;
-    let attributes = entry.attributes;
-    let id = entry.unique_partition_guid;
-    if kind != GptPartitionType::EFI_SYSTEM_PARTITION
-        || attributes.contains(GptPartitionAttributes::LEGACY_BIOS_BOOTABLE)
-        || id == uefi::guid!("00000000-0000-0000-0000-000000000000")
-    {
-        return Err(Status::UNSUPPORTED);
-    }
-    Ok(id)
-}
-fn read_prefix(file: &mut RegularFile, bytes: &mut [u8]) -> Result<usize, Status> {
-    let mut used = 0;
-    while used < bytes.len() {
-        let n = file.read(&mut bytes[used..]).map_err(|e| e.status())?;
-        if n == 0 {
-            break;
-        }
-        used += n;
-    }
-    Ok(used)
-}
-fn own_bytes() -> Result<Vec<u8>, Status> {
-    let name = CString16::try_from(crate::config::own_path()?.as_str())
-        .map_err(|_| Status::UNSUPPORTED)?;
-    let device = protocol::<LoadedImage>(boot::image_handle())?
-        .device()
-        .ok_or(Status::NOT_FOUND)?;
-    let mut fs = protocol::<SimpleFileSystem>(device)?;
-    let mut root = fs.open_volume().map_err(|e| e.status())?;
-    let mut file = root
-        .open(&name, FileMode::Read, FileAttribute::empty())
-        .map_err(|e| e.status())?
-        .into_regular_file()
-        .ok_or(Status::UNSUPPORTED)?;
-    let size = file
-        .get_boxed_info::<FileInfo>()
-        .map_err(|e| e.status())?
-        .file_size();
-    if size == 0 || size > 4 * 1024 * 1024 {
-        return Err(Status::BAD_BUFFER_SIZE);
-    }
-    let mut bytes = Vec::new();
-    bytes
-        .try_reserve_exact(size as usize)
-        .map_err(|_| Status::OUT_OF_RESOURCES)?;
-    bytes.resize(size as usize, 0);
-    if read_prefix(&mut file, &mut bytes)? != bytes.len() {
-        return Err(Status::END_OF_FILE);
-    }
-    Ok(bytes)
-}
-/// Header classification and exact current-binary exclusion, including renamed copies.
-fn candidate(
-    root: &mut Directory,
-    path: &str,
-    own: &[u8],
-    budget: &mut usize,
-) -> Result<bool, Status> {
-    // Charge the maximum requested bytes before each read, including self-copy comparisons.
-    fn read(file: &mut RegularFile, bytes: &mut [u8], budget: &mut usize) -> Result<usize, Status> {
-        *budget = budget
-            .checked_sub(bytes.len())
-            .ok_or(Status::OUT_OF_RESOURCES)?;
-        read_prefix(file, bytes)
-    }
-    let name = CString16::try_from(path).map_err(|_| Status::UNSUPPORTED)?;
-    let mut file = root
-        .open(&name, FileMode::Read, FileAttribute::empty())
-        .map_err(|e| e.status())?
-        .into_regular_file()
-        .ok_or(Status::UNSUPPORTED)?;
-    let size = file
-        .get_boxed_info::<FileInfo>()
-        .map_err(|e| e.status())?
-        .file_size();
-    let mut prefix = [0u8; 4096];
-    let n = read(&mut file, &mut prefix, budget)?;
-    if !is_x64_application(&prefix[..n], size) {
-        return Ok(false);
-    }
-    if size == own.len() as u64 {
-        file.set_position(0).map_err(|e| e.status())?;
-        let mut offset = 0;
-        while offset < own.len() {
-            let end = (offset + prefix.len()).min(own.len());
-            let len = end - offset;
-            if read(&mut file, &mut prefix[..len], budget)? != len {
-                return Err(Status::END_OF_FILE);
-            }
-            if prefix[..len] != own[offset..end] {
-                return Ok(true);
-            }
-            offset = end;
-        }
-        return Ok(false);
-    }
-    Ok(true)
-}
 impl Scan {
     fn walk(
         &mut self,
@@ -327,7 +209,7 @@ impl Scan {
         }
         Ok(())
     }
-    fn draw(&self, selected: usize, notice: &str) {
+    fn draw(&self, selected: usize, notice: &str, picking: bool) {
         system::with_stdout(|out| {
             let _ = out.clear();
         });
@@ -365,19 +247,30 @@ impl Scan {
             uefi::println!("No eligible applications found.");
         }
         uefi::println!(
-            "\n{} / {}\n{}\nUp/Down: select  Enter: inspect  R: rescan  Esc: menu",
+            "\n{} / {}\n{}\nUp/Down: select  {}  R: rescan  Esc: back",
             if self.targets.is_empty() {
                 0
             } else {
                 selected + 1
             },
             self.targets.len(),
-            notice
+            notice,
+            if picking {
+                "Enter: add to draft"
+            } else {
+                "Enter: start  A: add to draft"
+            }
         );
     }
 }
 
-pub fn run() {
+pub fn run() -> Option<Selection> {
+    browse(false)
+}
+pub fn pick() -> Option<Selection> {
+    browse(true)
+}
+fn browse(picking: bool) -> Option<Selection> {
     crate::trace("DISCOVERY_OPEN");
     'scan: loop {
         system::with_stdout(|out| {
@@ -396,7 +289,7 @@ pub fn run() {
                 crate::trace(&format!("DISCOVERY_ERROR {status:?}"));
                 loop {
                     match key() {
-                        Some(Key::Special(ScanCode::ESCAPE)) | None => return,
+                        Some(Key::Special(ScanCode::ESCAPE)) | None => return None,
                         Some(Key::Printable(c)) if char::from(c).eq_ignore_ascii_case(&'r') => {
                             continue 'scan;
                         }
@@ -408,7 +301,7 @@ pub fn run() {
         let mut menu = Menu::default();
         let mut notice = String::new();
         loop {
-            scan.draw(menu.selected, &notice);
+            scan.draw(menu.selected, &notice, picking);
             crate::trace(&format!(
                 "DISCOVERY_READY targets={} selected={} partial={}",
                 scan.targets.len(),
@@ -418,12 +311,46 @@ pub fn run() {
             match key() {
                 None | Some(Key::Special(ScanCode::ESCAPE)) => {
                     crate::trace("DISCOVERY_CLOSED");
-                    return;
+                    return None;
                 }
                 Some(Key::Special(ScanCode::UP)) => menu.previous(scan.targets.len()),
                 Some(Key::Special(ScanCode::DOWN)) => menu.next(scan.targets.len()),
                 Some(Key::Printable(c)) if char::from(c).eq_ignore_ascii_case(&'r') => {
                     continue 'scan;
+                }
+                Some(Key::Printable(c))
+                    if char::from(c).eq_ignore_ascii_case(&'a')
+                        || (picking && char::from(c) == '\r') =>
+                {
+                    if let Some(target) = scan.targets.get(menu.selected) {
+                        system::with_stdout(|out| {
+                            let _ = out.clear();
+                        });
+                        uefi::println!(
+                            "ADD TARGET TO UNSAVED DRAFT?\n\nESP {}\n{}\n\nDefault and timeout stay unchanged.\nY: add to draft   Any other key: cancel",
+                            scan.volumes[target.volume].id,
+                            target.path
+                        );
+                        crate::trace("DISCOVERY_IMPORT_CONFIRM");
+                        if matches!(key(), Some(Key::Printable(c)) if char::from(c).eq_ignore_ascii_case(&'y'))
+                        {
+                            match scan.verify(target) {
+                                Ok(()) => {
+                                    crate::trace("DISCOVERY_PICKED");
+                                    return Some(Selection {
+                                        partition_guid: format!(
+                                            "{}",
+                                            scan.volumes[target.volume].id
+                                        ),
+                                        path: target.path.clone(),
+                                    });
+                                }
+                                Err(s) => {
+                                    notice = format!("Target check: {s:?}. Rescan before retry.")
+                                }
+                            }
+                        }
+                    }
                 }
                 Some(Key::Printable(c)) if char::from(c) == '\r' => {
                     if let Some(target) = scan.targets.get(menu.selected) {

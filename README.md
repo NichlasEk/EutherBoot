@@ -11,7 +11,8 @@ configurable default/timeout, keyboard navigation, paginated menus and firmware
 text fallback. Its keyboard editor supports isolated drafts, validation, preview,
 confirmed saves with backup, and explicit recovery after interrupted saves.
 F4 discovers EFI applications on GPT EFI System Partitions for explicit manual
-launch. A separate EFI child demonstrates returning success and failure.
+launch or import into an unsaved configuration draft. Persisted targets can select
+an ESP by its unique partition GUID. A separate EFI child demonstrates returning success and failure.
 No installed operating system, physical hardware or Secure Boot has been tested.
 
 ## Build and run
@@ -26,7 +27,7 @@ isolated rustup installation under `.tools/` without changing the host compiler.
 ./scripts/build.sh
 python3 scripts/qemu.py                 # interactive window
 ./scripts/validate-config.sh eutherboot.toml
-./scripts/test.sh                       # 19 Rust tests + 36 OVMF cases
+./scripts/test.sh                       # 21 Rust tests + 47 OVMF cases
 ```
 
 Override `OVMF_CODE` and `OVMF_VARS` if needed. Defaults are Arch Linux's
@@ -67,14 +68,50 @@ type = "efi"
 path = '\EFI\EutherBoot\TestChild.efi'
 ```
 
+An entry may additionally select a specific GPT EFI System Partition:
+
+```toml
+[[entry]]
+id = "other-esp"
+name = "Boot application on another ESP"
+type = "efi"
+path = '\EFI\Tools\loader.efi'
+partition_guid = "aabbccdd-1234-5678-9012-aabbccddeeff"
+```
+
+The GUID above is an example, not a host-machine value. Use the **unique partition
+GUID** (PARTUUID), not the filesystem UUID, disk GUID or ESP type GUID. Omit
+`partition_guid` to use EutherBoot's own volume, preserving previous behavior.
+An explicit GUID must be nonzero hexadecimal in 8-4-4-4-12 form; uppercase is
+accepted and normalized. An explicitly empty string is invalid.
+
+On every launch, an explicit selector must resolve to exactly one eligible GPT
+ESP. A missing/duplicate GUID or identity-enumeration error fails with a diagnostic;
+there is no fallback to the own volume or another discovered target. If the
+configured default's selector cannot resolve at startup, its automatic timer is
+disabled. Other entries remain available for deliberate selection. File checks
+and LoadImage errors retain the menu without retries or fallback.
+
+Paths may repeat on different partition selectors. Repeating a case-insensitive
+path on the same selector is rejected; firmware also rejects an implicit own-volume
+entry and explicit own-GUID entry referring to the same file. Self-path checks
+include the volume, so the same path on a different ESP remains valid. GUID-qualified
+launches also apply discovery's image-header and exact-self-copy checks.
+
+Validation can accept a well-formed GUID for an absent disk; availability is
+checked at launch (and before arming a qualified default's timer). This allows
+editing entries for temporarily disconnected media. Configuration and backups
+are still written **only on EutherBoot's own volume**, never to the selected ESP.
+
 `default` must match a unique entry ID. `timeout` is 0..3600 seconds; zero or
 omission means wait indefinitely. Appearance is `system-regis` (the default) or `text`. A positive timeout starts the default once, after the initial
 menu appears. **Any key cancels it**, including keys with no other action.
 Load failures and returning children retain the menu and never restart the timer.
 
 The entire configuration is rejected for unknown fields, invalid TOML/UTF-8,
-unsupported types/themes, missing/duplicate IDs, duplicate case-insensitive
-paths, an unresolved default or a reference to EutherBoot's own loaded path.
+unsupported types/themes, malformed partition GUIDs, missing/duplicate IDs,
+duplicate case-insensitive paths on the same selector, an unresolved default or
+a reference to EutherBoot's own loaded path on its own volume.
 Unfinished saves (`.new` or `.txn` present) also block automatic boot.
 On error, no configured targets are enabled and no timer is armed; the error
 appears in text mode with read-only inspection and return-to-firmware available.
@@ -109,7 +146,12 @@ applications by **partition GUID and full file path**, sorted independently of
 firmware handle order. Long paths are abbreviated in the list; Enter displays
 the complete path and GUID, and only **Y** starts that target. Escape returns to
 the main menu; **R** rescans. F4 cancels any configured timeout, and leaving the
-browser never rearms it. No discovered target is added to TOML or made a default.
+browser never rearms it. **A**, then Y, hands the selected target to a new editor
+draft. Import does not write, change the default or adjust the timeout. The draft
+requires a valid existing configuration and no unfinished save; choose **S**, then
+Y to persist it. Generated IDs/names can be reviewed before saving. Duplicate
+imports are rejected. Files unsupported by the TOML path schema cannot be imported.
+No target becomes a default unless you explicitly select it with D in the editor.
 
 The initial scanner uses firmware filesystem and partition protocols. It accepts
 GPT partitions explicitly typed as EFI System Partitions, searches `\EFI`, and
@@ -149,6 +191,8 @@ Press **E** to begin a separate draft. Up/Down selects the entry to edit.
 | A | Add an entry by ID, name and EFI path |
 | R | Remove the selected entry after confirmation |
 | N / P | Change the selected entry's name / path |
+| U | Edit partition GUID; clear the field to select the own volume |
+| I | Browse EFI targets and import one into the current draft |
 | V | Validate the draft with the shared parser and self-reference check |
 | F5 | Preview without booting or changing the live configuration |
 | S | Validate and open a save confirmation; only Y writes |
@@ -195,6 +239,8 @@ python3 scripts/editor-qemu.py --case save
 python3 scripts/editor-qemu.py --case readonly
 python3 scripts/discovery-qemu.py --case multiple
 python3 scripts/discovery-qemu.py --case duplicate
+python3 scripts/cross-volume-qemu.py --case save
+python3 scripts/cross-volume-qemu.py --case missing
 python3 scripts/discovery-qemu.py --case multiple --width 640 --height 480
 ./scripts/build-faults.sh
 python3 scripts/editor-qemu.py --case after-backup

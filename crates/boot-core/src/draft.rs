@@ -7,6 +7,8 @@ pub struct DraftEntry {
     pub id: String,
     pub name: String,
     pub path: String,
+    /// Empty selects EutherBoot's own volume. Nonempty remains unvalidated draft text.
+    pub partition_guid: String,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Draft {
@@ -25,6 +27,7 @@ impl From<&Config> for Draft {
                     id: e.id().into(),
                     name: e.name().into(),
                     path: e.path().into(),
+                    partition_guid: e.partition_guid().unwrap_or("").into(),
                 })
                 .collect(),
             default: c.entries()[c.default_index()].id().into(),
@@ -47,6 +50,37 @@ fn quote(s: &str) -> String {
     out
 }
 impl Draft {
+    /// Import only target identity; preserve the user's default and timeout.
+    pub fn import_target(&mut self, guid: &str, path: &str) -> Result<usize, String> {
+        if self.entries.len() >= config::MAX_ENTRIES {
+            return Err("At most 16 entries are allowed".into());
+        }
+        if !config::valid_partition_guid(guid) || !config::valid_path(path) {
+            return Err("Target cannot be represented by the current GUID/path schema".into());
+        }
+        if self.entries.iter().any(|e| {
+            e.partition_guid.eq_ignore_ascii_case(guid) && e.path.eq_ignore_ascii_case(path)
+        }) {
+            return Err("Target is already present in the draft".into());
+        }
+        let mut number = 1;
+        let id = loop {
+            let id = format!("efi-{number}");
+            if !self.entries.iter().any(|e| e.id == id) {
+                break id;
+            }
+            number += 1;
+        };
+        let file = path.rsplit('\\').next().unwrap_or("EFI application");
+        let short: String = file.chars().take(32).collect();
+        self.entries.push(DraftEntry {
+            id,
+            name: format!("{short} [{}]", &guid[..8]),
+            path: path.into(),
+            partition_guid: guid.to_ascii_lowercase(),
+        });
+        Ok(self.entries.len() - 1)
+    }
     pub fn document(&self) -> Result<String, String> {
         // Never interpolate user-entered TOML syntax as a numeric value.
         let timeout: u16 = self
@@ -65,6 +99,9 @@ impl Draft {
                 quote(&e.name),
                 quote(&e.path)
             ));
+            if !e.partition_guid.is_empty() {
+                s.push_str(&format!("partition_guid = {}\n", quote(&e.partition_guid)));
+            }
         }
         config::parse(&s)?;
         Ok(s)
@@ -96,11 +133,31 @@ mod tests {
             id: "second".into(),
             name: "Other".into(),
             path: "\\EFI\\Other.efi".into(),
+            partition_guid: String::new(),
         });
         d.entries.remove(0);
         assert!(d.document().is_err());
         d.default = "second".into();
         assert!(d.document().is_ok());
+    }
+    #[test]
+    fn imported_target_roundtrips_without_changing_boot_policy() {
+        let mut d = Draft::from(&base());
+        let guid = "aabbccdd-1234-5678-9012-aabbccddeeff";
+        let path = "\\EFI\\Tools\\shared.efi";
+        assert_eq!(d.import_target(guid, path).unwrap(), 1);
+        assert_eq!(d.default, "test");
+        assert_eq!(d.timeout, "0");
+        assert!(d.import_target(&guid.to_ascii_uppercase(), path).is_err());
+        let parsed = config::parse(&d.document().unwrap()).unwrap();
+        assert_eq!(parsed.entries()[1].partition_guid(), Some(guid));
+        d.entries[1].partition_guid.clear();
+        assert_eq!(
+            config::parse(&d.document().unwrap()).unwrap().entries()[1].partition_guid(),
+            None
+        );
+        d.entries[1].partition_guid = "bad".into();
+        assert!(d.document().is_err());
     }
     #[test]
     fn invalid_draft_cannot_serialize_as_valid_config() {
