@@ -462,3 +462,41 @@ pre-hook prevents the second package transaction from replacing the installed
 version/payload. The hooks' Exec commands are assertion oracles in this fixture;
 real NVIDIA/DKMS operation remains untested. The signed base image and read-only
 virtual ESP were unchanged.
+
+The additional 1 GiB shared-`/boot` run rejected installation with approximately
+419 MiB free before creating an EFI installation, integration file or journal.
+After removing its temporary filler, it installed and booted the Btrfs `@` root
+with udev initramfs, active swap and no failed services. The later real pacman
+transaction was then correctly refused: the generation budget required
+616,449,828 bytes but only 528,293,888 were free. Pacman reported that no packages
+were upgraded. These partial-run logs are retained under
+`artifacts/arch-host-layout-capacity-refusal/`; they establish the refusal and
+first boot, not a completed recovery matrix on 1 GiB.
+
+Preparing the `@` fixture first exposed its separately nested swap subvolume,
+and then the cloud image's lack of an explicit root fstab entry. The fixture now
+adds explicit root and swap mounts. The failed runs remain distinct from passing
+evidence and are not attributed to a firmware or bootloader defect.
+
+The prepared USB-image file also passed an independent QEMU test using the exact
+non-instrumented release EFI. Framebuffer observations establish that the System
+Regis menu is displayed before input; Enter starts a test child on the explicitly
+selected second ESP, and returning restores the menu. Both disk-image hashes are
+unchanged. Evidence: `artifacts/host-probe/usb-result.json` and PNG captures under
+`boot-1/`. The second ESP is a disposable stand-in with the requested partition
+identity; this is not a physical GRUB boot. No image was flashed to physical media.
+
+The complete `btrfs-at-udev` matrix subsequently passed with a **2 GiB virtual
+ESP**. `artifacts/arch-host-layout/result.json` records the actual size and all
+seven managed Linux boots, plus bootstrap and the original fallback child.
+Every managed boot verified FSROOT `/@`, FAT `/boot`, the expected kernel, working
+module loading and no failed services, including swap. Installation refusal at
+approximately 419 MiB free was exercised before the positive run. Current/LTS,
+missing-module recovery, original-kernel recovery, repair, signed release upgrade,
+automatic boot and uninstall passed with disposable owner-key Secure Boot.
+The original Arch image and fallback loader hashes were unchanged.
+
+This is not evidence that the complete generation store fits the inventoried
+1 GiB host ESP, nor that NVIDIA hardware or the physical firmware has passed.
+The large-initramfs capacity case is synthetic, and the guest uses virtio/Btrfs
+modules instead of NVIDIA. Hardware testing remains a separate gate.

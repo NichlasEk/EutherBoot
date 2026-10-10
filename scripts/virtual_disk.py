@@ -6,7 +6,7 @@ import subprocess
 
 
 def create(source: Path, temporary: Path, esp_mib: int = 64) -> Path:
-    if not 64 <= esp_mib <= 1024: raise ValueError('ESP size outside fixture bounds')
+    if not 64 <= esp_mib <= 2048: raise ValueError('ESP size outside fixture bounds')
     disk = temporary/'disk.img'
     fat = temporary/'fat.img'
     # Exclusive creation prevents accidentally reusing an existing file/device.

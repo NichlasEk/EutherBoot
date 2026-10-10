@@ -31,7 +31,8 @@ The fixture does not prove arbitrary physical power-loss atomicity, all Arch
 storage/encryption layouts, userspace rollback or production Secure Boot trust.
 Generation prune protections are tested separately in `tests/installer/`.
 
-`--layout btrfs-at-udev` selects the additional layout described in
+`--layout btrfs-at-udev` defaults to a 2 GiB disposable ESP; `--esp-mib 1024`
+can reproduce the tighter capacity gate. It selects the layout described in
 [the compatibility gate](../../../docs/HOST-COMPATIBILITY.md): FAT `/boot`, Btrfs
 `@`, separately mounted swap subvolume and udev default/fallback initramfs images.
 A temporary filler leaves approximately 419 MiB free before an installation

@@ -19,8 +19,10 @@ import virtual_disk
 ROOT=Path(__file__).resolve().parent.parent
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--layout',choices=('stock','btrfs-at-udev'),default='stock')
+parser.add_argument('--esp-mib',type=int,choices=(1024,2048),help='Disposable ESP size; host-like layout defaults to 2048')
 args=parser.parse_args()
 host_layout=args.layout=='btrfs-at-udev'
+esp_mib=args.esp_mib or (2048 if host_layout else 1024)
 def mount_paths(text):
     return re.sub(r'(?<![\w/.-])/eutherboot(?=/|[ ;\"\'\n]|$)', '/boot', text) if host_layout else text
 def command(v,serial,script,timeout=180):
@@ -83,7 +85,7 @@ with tempfile.TemporaryDirectory(prefix='eutherboot-release-') as directory:
         '--add-db',OWNER,tmp/'owner.crt','--sb','--append-boot-filepath',r'\EFI\EutherBoot\EutherBoot.efi')
     for name in ('bootstrap-disk','target-disk'):(tmp/name).mkdir()
     first_disk=virtual_disk.create(bootstrap,tmp/'bootstrap-disk',esp_mib=128)
-    disk=virtual_disk.create(target,tmp/'target-disk',esp_mib=1024)
+    disk=virtual_disk.create(target,tmp/'target-disk',esp_mib=esp_mib)
     run('sgdisk','-u',f'1:{GUID}',disk)
     overlay=tmp/'arch.qcow2';run('qemu-img','create','-f','qcow2','-F','qcow2','-b',image,overlay)
     # Upgrade/setup, current, LTS, failed current -> recovery, LTS repair, old kernel, uninstall.
@@ -179,7 +181,7 @@ test ! -e /etc/pacman.d/hooks/05-eutherboot.hook
     run('mcopy','-o','-i',f'{disk}@@1048576','::/EFI/BOOT/BOOTX64.EFI',readback)
     assert sha(readback)==original_loader
     assert sha(image)==manifest['image_sha256']
-(OUT/'result.json').write_text(json.dumps({'capacity_refusal_before_mutation':True,'layout':args.layout,'boots':boots,'original_image_unchanged':True,
+(OUT/'result.json').write_text(json.dumps({'esp_mib':esp_mib,'capacity_refusal_before_mutation':True,'layout':args.layout,'boots':boots,'original_image_unchanged':True,
     'original_loader_unchanged':True,'secure_boot':'disposable owner key; installed normal, LTS and recovery UKIs',
     'install_remove':'plan read-only; explicit apply; original fallback booted',
     'release_upgrade':'signed non-instrumented EFI; automatic LTS boot; empty debug trace'},indent=2)+'\n')

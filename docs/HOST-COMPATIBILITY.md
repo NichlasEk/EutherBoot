@@ -50,7 +50,10 @@ The kernel under `/boot` must match that tree's kernel before capture.
 python3 scripts/arch-release-qemu.py --layout btrfs-at-udev
 ```
 
-This variant uses disposable disks and temporary OVMF keys. It mounts the guest
+This variant uses disposable disks and temporary OVMF keys. Its positive recovery
+matrix uses a 2 GiB virtual ESP, explicitly larger than the inventoried host ESP.
+The 1 GiB run booted the `@` root with no failed units, then correctly refused
+the package transaction when retained-generation headroom was insufficient. It mounts the guest
 ESP at `/boot`, builds udev-based default/fallback initramfs images, snapshots the
 guest root into `@` before the first managed boot and uses explicit `rootflags`.
 Every subsequent Linux oracle requires root FSROOT `/@` and FAT `/boot`. A stale,
@@ -72,3 +75,35 @@ media and chainload the established loader. That tests firmware/menu integration
 without requiring the managed UKI layout to fit the existing ESP. Preparing media
 or writing a host ESP is a separate explicit action with a concrete destination
 and rollback plan. It has not been performed or demonstrated here.
+
+Before interpreting any hardware-probe failure, establish a cold-boot baseline
+through the unchanged GRUB path: the inventoried running and installed kernel
+versions differ. The next ordinary reboot already exercises a pending Arch kernel
+update independently of EutherBoot. No reboot was requested or performed by the
+inventory tooling.
+
+## Prepared USB image file
+
+```sh
+python3 scripts/prepare-host-probe.py --target-guid YOUR-EXISTING-ESP-PARTUUID
+```
+
+This creates `artifacts/host-probe/usb.img`, a 128 MiB GPT disk image with a
+64 MiB FAT ESP, the non-instrumented EFI release, its GPL license and matching
+source archive. The configuration has timeout zero and explicitly selects the
+existing loader's partition GUID and EFI path. The default path is
+`\EFI\BOOT\BOOTX64.EFI`; it must be confirmed on the intended machine.
+The image contains no copy of the existing loader and does not install Arch hooks.
+
+Before publishing the local file, the script boots those exact image bytes in
+QEMU, observes the System Regis framebuffer, selects a disposable EFI child on a
+second virtual ESP with the requested identity and verifies return to the menu.
+Both virtual disk hashes must remain unchanged. No host disk is attached. This
+proves the image/menu/partition-selection route, not physical GRUB compatibility.
+Result metadata and PNG captures are under `artifacts/host-probe/`.
+
+Creating the file does not flash a USB stick. A physical test still requires an
+explicitly identified disposable destination and use of the firmware's one-time
+boot selector. Boot order and installed loaders need not be changed for that test.
+The currently prepared image is unsigned, matching the inventoried disabled
+Secure Boot state; do not change firmware trust settings merely to run it.
