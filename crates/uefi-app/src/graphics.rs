@@ -131,7 +131,7 @@ pub fn draw(labels: &[&str], selected: usize, notice: &str) -> Result<(), Status
     c.text(
         40,
         h - 44,
-        "UP/DOWN Select  ENTER Open  F2 Text  F3 Edit  ESC Return",
+        "Arrows Select  ENTER Open  F2 Text  F3 Edit  F4 Scan  ESC",
         1,
         MUTED,
     );

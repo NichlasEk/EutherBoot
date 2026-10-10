@@ -7,12 +7,13 @@
 | C · First boot | Demonstrated in QEMU | Independent EFI child starts and returns; missing/invalid image and ABORTED cases preserve the menu |
 | D · Configuration | Demonstrated in QEMU | Shared Rust TOML parser, same-volume reads, dynamic targets, strict validation, default and cancellable one-shot timeout |
 | E · Editor | Demonstrated in QEMU | Keyboard drafts, default/timeout/appearance, add/remove, preview, confirmed save, backup and explicit recovery on GPT/FAT |
-| F · Compatibility | Not implemented | Linux EFI-stub/UKI, initrd/command line, multiple ESPs, signed/rejected images and recovery matrix |
+| F · Compatibility | Started in QEMU | Multiple GPT ESP discovery and explicit cross-volume EFI child launch demonstrated; Linux EFI-stub/UKI, initrd/command line and Secure Boot remain |
 | G · Hardware | Not authorized or tested | Dedicated machine, separately approved installation, known-good boot path and rollback |
 
-Next: read-only discovery across EFI System Partitions, with stable volume
-identity, self-exclusion and no guessed automatic defaults. Broader third-party
-chainloader cleanup and Linux EFI-stub/UKI compatibility follow as separate gates.
+Read-only discovery is demonstrated: F4, stable partition GUIDs, full device paths,
+exact self-copy exclusion, duplicate-GUID rejection and no automatic defaults.
+Next: explicit persisted cross-volume targets in TOML/editor, followed by broader
+third-party chainloader cleanup and Linux EFI-stub/UKI as separate gates.
 Event-based input, richer editor styling and Unicode remain refinements.
 
 C demonstrates a known unsigned application under ordinary OVMF, not arbitrary

@@ -3,6 +3,7 @@
 extern crate alloc;
 mod compiler_support;
 mod config;
+mod discovery;
 mod editor;
 mod graphics;
 mod loader;
@@ -42,7 +43,7 @@ fn render(labels: &[&str], menu: &Menu, notice: &str, text: bool) -> bool {
         uefi::println!("{} {}", if i == menu.selected { ">" } else { " " }, entry);
     }
     uefi::println!(
-        "\n{}/{}\n{}\nUp/Down: select  Enter: open  F2: text  F3: editor  Esc: return",
+        "\n{}/{}\n{}\nUp/Down: select  Enter: open  F2: text  F3: editor  F4: discover  Esc: return",
         menu.selected + 1,
         labels.len(),
         notice
@@ -152,6 +153,11 @@ fn session(allow_timeout: bool) -> Option<Status> {
                 Key::Special(ScanCode::ESCAPE) => {
                     trace("EXIT_FIRMWARE");
                     return Some(Status::SUCCESS);
+                }
+                Key::Special(ScanCode::FUNCTION_4) => {
+                    discovery::run();
+                    notice = "Discovery closed. Automatic boot disabled.".into();
+                    redraw = true;
                 }
                 Key::Special(ScanCode::FUNCTION_3) => {
                     if editor::run() {

@@ -1,6 +1,7 @@
 #![no_std]
 extern crate alloc;
 pub mod config;
+pub mod discovery;
 pub mod draft;
 pub mod transaction;
 

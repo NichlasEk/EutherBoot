@@ -1,7 +1,7 @@
-//! Chainload a validated EFI entry on our own volume.
+//! Chainload an explicit path on an explicit volume.
 use core::mem::MaybeUninit;
 use uefi::{
-    CString16, Status,
+    CString16, Handle, Status,
     boot::{self, LoadImageSource, OpenProtocolParams},
     proto::{
         BootPolicy,
@@ -24,13 +24,17 @@ pub enum LoadError {
 
 /// No discovery, ambiguous volume selection, automatic retry or persistent writes.
 pub fn chainload(entry: &boot_core::config::Entry) -> Result<(), LoadError> {
-    let filename = CString16::try_from(entry.path())
-        .map_err(|_| LoadError::Device(Status::INVALID_PARAMETER))?;
     let device = {
         let image = boot::open_protocol_exclusive::<LoadedImage>(boot::image_handle())
             .map_err(|e| LoadError::Device(e.status()))?;
         image.device().ok_or(LoadError::Device(Status::NOT_FOUND))?
     };
+    chainload_path(device, entry.path())
+}
+
+pub fn chainload_path(device: Handle, filename: &str) -> Result<(), LoadError> {
+    let filename =
+        CString16::try_from(filename).map_err(|_| LoadError::Device(Status::INVALID_PARAMETER))?;
     let mut buffer = [MaybeUninit::uninit(); 4096];
     let path = {
         let volume = boot::open_protocol_exclusive::<DevicePath>(device)

@@ -1,5 +1,6 @@
 #![no_std]
 #![no_main]
+extern crate alloc;
 
 use uefi::{
     boot,
@@ -34,6 +35,20 @@ fn main() -> Status {
         return Status::DEVICE_ERROR;
     }
     trace("CHILD_CONTEXT_OK");
+    // Report the actual firmware-provided child volume, not the parent's intent.
+    if let Ok(image) = boot::open_protocol_exclusive::<LoadedImage>(boot::image_handle()) {
+        if let Some(device) = image.device() {
+            if let Ok(partition) = boot::open_protocol_exclusive::<
+                uefi::proto::media::partition::PartitionInfo,
+            >(device)
+            {
+                if let Some(entry) = partition.gpt_partition_entry() {
+                    let guid = entry.unique_partition_guid;
+                    trace(&alloc::format!("CHILD_VOLUME {guid}"));
+                }
+            }
+        }
+    }
     system::with_stdout(|out| {
         let _ = out.clear();
     });

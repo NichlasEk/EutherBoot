@@ -9,7 +9,9 @@ The current prototype reads TOML from its own EFI volume, validates it strictly,
 displays configured EFI targets, and chainloads the selected application. It has
 configurable default/timeout, keyboard navigation, paginated menus and firmware
 text fallback. Its keyboard editor supports isolated drafts, validation, preview,
-confirmed saves with backup, and explicit recovery after interrupted saves. A separate EFI child demonstrates returning success and failure.
+confirmed saves with backup, and explicit recovery after interrupted saves.
+F4 discovers EFI applications on GPT EFI System Partitions for explicit manual
+launch. A separate EFI child demonstrates returning success and failure.
 No installed operating system, physical hardware or Secure Boot has been tested.
 
 ## Build and run
@@ -24,7 +26,7 @@ isolated rustup installation under `.tools/` without changing the host compiler.
 ./scripts/build.sh
 python3 scripts/qemu.py                 # interactive window
 ./scripts/validate-config.sh eutherboot.toml
-./scripts/test.sh                       # 17 Rust tests + 29 OVMF cases
+./scripts/test.sh                       # 19 Rust tests + 36 OVMF cases
 ```
 
 Override `OVMF_CODE` and `OVMF_VARS` if needed. Defaults are Arch Linux's
@@ -93,11 +95,46 @@ returns to the caller; it does not open firmware settings or change BootOrder.
 - Enter: start the selected EFI entry, inspect configuration or return to firmware.
 - F2: use firmware text output for the current menu session.
 - F3: open the configuration editor in read-only mode.
+- F4: scan GPT EFI System Partitions and browse discovered applications.
 - Escape: return to the firmware caller.
 - In the test child: Enter returns SUCCESS; Escape returns ABORTED.
 
 The menu's configuration summary is read-only and switches to text mode. The
 editor is opened with F3. No firmware-variable preferences or installer exist.
+
+## Discover EFI applications
+
+Press **F4** from the main menu. The read-only text browser lists eligible
+applications by **partition GUID and full file path**, sorted independently of
+firmware handle order. Long paths are abbreviated in the list; Enter displays
+the complete path and GUID, and only **Y** starts that target. Escape returns to
+the main menu; **R** rescans. F4 cancels any configured timeout, and leaving the
+browser never rearms it. No discovered target is added to TOML or made a default.
+
+The initial scanner uses firmware filesystem and partition protocols. It accepts
+GPT partitions explicitly typed as EFI System Partitions, searches `\EFI`, and
+filters `.efi` files for PE32+ x86_64 application headers. This excludes drivers,
+other architectures and obvious non-executables; firmware LoadImage still performs
+full validation/authentication. The scanner excludes byte-identical copies of the
+current on-disk EutherBoot executable, including renamed copies on another ESP.
+Different builds or modified/signed copies are not recognized as self-copies.
+
+Duplicate partition GUIDs exclude **all** affected volumes. Before launch, the
+saved handle's GUID and full device path are checked again and the file is
+reclassified. This is target identification, not a signature/trust check or a
+hot-plug security guarantee. Failed loads and returning children keep the browser.
+Discovery is available even when TOML is invalid, but still requires manual
+selection and confirmation; it never repairs configuration automatically.
+
+Bounds: at most 32 filesystem handles, 2048 directory records and 64 targets;
+`\EFI` plus four nested directory levels; 240-byte paths; printable ASCII names.
+Candidate header reads are limited to the first 4096 bytes and total candidate
+reads to 64 MiB per scan. Self-copy comparison requires a readable own executable
+of at most 4 MiB. Limits/read errors/duplicate GUIDs show a partial-scan notice;
+inability to verify the own executable disables discovery. Only firmware-exposed
+GPT ESPs are supported: no MBR/superfloppy, raw disk parsing, filesystem drivers,
+network search or controller connection is attempted. These restrictions do not
+change the existing same-volume configured-entry behavior.
 
 ## Configuration editor
 
@@ -156,6 +193,9 @@ python3 scripts/qemu.py --test --config-case unknown
 python3 scripts/qemu.py --test --config-case many --width 640 --height 480
 python3 scripts/editor-qemu.py --case save
 python3 scripts/editor-qemu.py --case readonly
+python3 scripts/discovery-qemu.py --case multiple
+python3 scripts/discovery-qemu.py --case duplicate
+python3 scripts/discovery-qemu.py --case multiple --width 640 --height 480
 ./scripts/build-faults.sh
 python3 scripts/editor-qemu.py --case after-backup
 ```

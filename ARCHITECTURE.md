@@ -3,7 +3,8 @@
 ## Implemented boundaries
 
 `boot-core` is no_std + alloc and contains the firmware-independent menu state
-and TOML schema/parser, unvalidated Draft model and transaction engine. `config-check` is a small host CLI using the exact same
+and TOML schema/parser, unvalidated Draft model, transaction engine and bounded
+EFI-header/name classification. `config-check` is a small host CLI using the exact same
 parser. There is no parallel Python schema to drift from firmware behavior.
 `toml` 1.1.8 and Serde are compiled without std; only parsing/deserialization and
 allocation features are enabled. The draft serializer emits a narrow, escaped
@@ -32,13 +33,14 @@ numbers where available, omit control characters and cap parser text length.
 
 Firmware additionally compares every target to the loaded application's own
 path, case-insensitively, rejecting a direct self-reference. This is not a binary
-identity check: a renamed copy of EutherBoot could still recurse. Such detection
-and broader volume/discovery policies remain future work. Host validation cannot
+identity check: a renamed copy of EutherBoot could still recurse. The separate discovery browser additionally excludes exact binary copies;
+configured entries retain the existing path-only check. Host validation cannot
 verify this runtime identity or prove that any configured file exists.
 
 A configuration error disables all configured entries and automatic boot. The
 built-in read-only inspection and return-to-firmware actions remain available.
-No disk discovery or other-volume guessing occurs. Configuration file writes
+F4 explicitly enters discovery independently of configuration validity; discovered
+entries never participate in the configured timeout. Configuration file writes
 are exclusively behind the editor's explicit Save/Recovery confirmation; no
 firmware-variable preferences are written.
 
@@ -68,8 +70,8 @@ best-effort; simultaneous loss of both GOP and text output is unresolved.
 
 ## EFI image lifecycle
 
-`loader` builds a full device path from the application's own device and the
-validated entry path, in a bounded 4096-byte buffer. It calls LoadImage/ExactMatch
+`loader` builds a full device path from an explicit volume handle and file path
+(the application's own device for configured entries), in a bounded 4096-byte buffer. It calls LoadImage/ExactMatch
 and StartImage with no borrowed protocols or graphics buffers held across transfer.
 This is EFI chainloading, not arbitrary Linux-kernel loading. No command lines,
 initrds or ExitBootServices handoff are implemented.
@@ -91,8 +93,8 @@ exits boot services cannot be recovered by this menu.
 
 ## Subsequent modules
 
-- Discovery: read-only filesystem/ESP enumeration with stable volume/device identity,
-  self-exclusion and no automatic promotion of unknown files to boot defaults.
+- Persisted cross-volume targets: explicit partition-GUID schema/editor support,
+  with ambiguity handling on each boot. Discovery currently stays session-only.
 - Preferences: optional vendor-GUID variables with bounded versioned data, written
   only by an explicit user action. Unsupported persistence remains nonfatal.
 - Linux/UKI: separate command-line, initrd, memory-map and handoff logic, tested
@@ -188,3 +190,51 @@ Tests kill QEMU at those flushed boundaries, then boot the normal artifact on th
 same GPT/FAT disk and verify explicit recovery. This simulates process loss, not
 arbitrary physical sector tearing. Host tests also inject each failed mutation,
 a corrupt staging readback and a stale source to verify original preservation.
+
+
+## Implemented read-only discovery
+
+F4 invokes a separate text browser, cancelling the menu timer through the existing
+any-key rule. Discovery starts only on request or R rescan. Enumerate firmware
+SimpleFileSystem handles; consult PartitionInfo for GPT ESP type, nonzero unique
+partition GUID, and absence of the legacy-BIOS attribute. Do not infer ESP status
+from FAT alone, partition position, a filename, or the current boot source.
+Duplicate GUIDs exclude every matching handle, even if their paths differ.
+Volumes sort by full GUID; candidates sort by volume then case-insensitive path.
+Each candidate retains its specific volume index/handle and exact path. The same
+path on two different ESPs remains two distinct choices.
+
+Short synchronous GET_PROTOCOL borrows avoid disconnecting filesystem drivers.
+All filesystem opens use FileMode::Read. No firmware variables are read or written
+by this feature, and no ConnectController, partition writes, driver loading or
+filesystem repair is attempted. FAT/partition enumeration is delegated to firmware.
+A full device-path snapshot accompanies each GUID. At explicit Y launch, reread
+the selected handle's identity/path, reclassify the file and exclude exact self
+copies again; then drop every protocol/file borrow before calling the shared
+LoadImage/StartImage implementation. A device cannot be silently substituted by a
+first-match GUID search. Concurrent/hot-plug mutation and cryptographic identity
+are not solved by these checks; this is ordinary firmware file loading.
+
+Header classification checks DOS/PE signature, bounded e_lfanew, x86_64 machine,
+PE32+ optional header, plausible section count/table extent and application
+subsystem (10). The header must fit the 4096-byte prefix; e_lfanew is at most 3072,
+files at most 128 MiB. This is intentionally not a PE loader, UKI detector or full
+validator. LoadImage remains authoritative and can reject a classified candidate.
+Do not interpret recognition as trust, OS compatibility or successful boot.
+
+The current on-disk own image (at most 4 MiB) is read once. Same-size candidates
+are compared byte-for-byte in bounded chunks, preventing exact renamed-copy
+recursion without a new hashing dependency. Different builds/signatures or a
+changed own file remain limitations. The scanner fails closed when that reference
+cannot be read. Directory records use an aligned fixed 1024-byte buffer. Paths
+are bounded printable ASCII without traversal/control characters; unsupported
+names are skipped. Depth, record, target and 64 MiB read budgets limit scanning;
+partial results are clearly labelled. Firmware calls themselves have no watchdog.
+See README for all caps. Candidate promotion to persisted TOML is not implemented.
+
+Discovery tests use two ESPs and one non-ESP FAT partition on a temporary GPT disk.
+The independent child reports its actual LoadedImage device's partition GUID,
+proving which volume supplied identical paths. Read/write-enabled virtual disks
+are hashed in full before/after the session to check absence of writes, rather
+than merely relying on a read-only QEMU drive setting. Secure Boot, real operating
+systems and hardware remain separate gates.

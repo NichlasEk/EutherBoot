@@ -1,24 +1,25 @@
-# Validation · 2026-10-10 · Editor milestone
+# Validation · 2026-10-10 · Multi-ESP discovery
 
 Host: Rust 1.99.0, QEMU 11.1.2 TCG/q35, ordinary OVMF, x86_64 UEFI target.
 This is virtual-development evidence, not physical hardware or OS boot evidence.
 
 ## Shared parser and builds
 
-Seventeen Rust tests cover menu wrap/empty state, the example and safe defaults,
+Nineteen Rust tests cover menu wrap/empty state, the example and safe defaults,
 non-first defaults, positive timeouts, malformed TOML, unknown/duplicate fields,
 bad types/ranges/themes, duplicate IDs and case-insensitive paths, unsupported
 entry types, traversal/aliases, display controls/Unicode and resource bounds.
 The host CLI validates the same example with the same no_std parser as firmware.
 Draft tests cover isolation, serialization and validation. Transaction tests inject
 failed mutations and corrupt readback, reject stale drafts, and preserve a valid
-backup during interrupted recovery. Both real PE32+ EFI executables build with
+backup during interrupted recovery. Discovery tests reject unsafe names, truncated
+headers, drivers and wrong architectures. Both real PE32+ EFI executables build with
 Cargo.lock, including the parser. The normal firmware also passes a build check
 without debug features.
 
 ## OVMF matrix
 
-`./scripts/test.sh` builds/tests and runs **29 independent QEMU cases**. Each has
+`./scripts/test.sh` builds/tests and runs **36 independent QEMU cases**. Each has
 its own disposable FAT filesystem and firmware-variable copy, with no attached
 host disks or networking. Editor tests use a real virtual GPT/FAT disk image. At most three VMs run concurrently. Test steps have
 deadlines; an outer timeout interrupts the runner/VM process group.
@@ -41,6 +42,12 @@ deadlines; an outer timeout interrupts the runner/VM process group.
 | Invalid editor draft | 1 | Self-reference and missing default rejected; explicit default repair validates |
 | Read-only disk | 1 | Save reports WRITE_PROTECTED; original unchanged |
 | Interrupted save at three checkpoints | 3 | Kill after staging, backup or install; next boot blocks automatic selection; explicit recovery succeeds |
+| Multi-ESP discovery at both resolutions | 2 | Same path on two ESPs launches from the selected volume, proven by child-reported GUID; data partition and self-copies excluded |
+| Duplicate GPT GUIDs | 1 | All ambiguous ESPs excluded; no targets promoted |
+| Empty discovery | 1 | Only self/non-application files present; empty menu remains usable |
+| Discovery candidate limit | 1 | 64-target cap is visible as partial; pagination reaches last entry |
+| Classified but unloadable image | 1 | Firmware LoadImage rejects malformed section extent; browser retained and another target can start |
+| Discovery after malformed TOML | 1 | Configured targets/timer remain disabled; separately confirmed discovered target boots |
 
 The original five chainload cases each perform three explicit attempts in one
 VM, including text mode. Positive configuration cases move the child away from
@@ -72,27 +79,44 @@ same image. These are controlled interruption tests, not proof against torn
 sectors or all physical power-loss behavior. No host boot configuration or
 firmware variables were modified by EutherBoot.
 
-The full 28-case suite passed before extracting the shared virtual-disk helper.
-After extraction, the additional GPT/FAT case and the 640×480 editor save/reboot/
-restore case passed. Together these demonstrate all 29 cases in the current matrix.
+The full 36-case suite is exercised by `./scripts/test.sh`; its combined run log
+is `artifacts/discovery-regression.log`. Discovery uses two ESPs and one non-ESP
+FAT partition on one generated GPT disk. Fixtures include identical paths,
+a renamed EutherBoot binary on the second ESP, invalid PE data, an AArch64 image,
+and an EFI driver. Only eligible targets appear. Enter/cancel does not load an
+image; Y starts the selected one. Child-reported LoadedImage GUIDs independently
+confirm volume choice. Success and ABORTED return to the browser; R reconstructs
+the same sorted target list. Entering discovery cancels the configured timer;
+waiting past its deadline in the browser and after exit never triggers boot.
+
+Discovery evidence lives under `artifacts/discovery-<case>-<width>x<height>/`:
+debug/serial/QEMU logs, PPM screenshots and a result file with the identical
+before/after SHA-256 of the entire writable virtual disk. No disk differences
+were observed in these tests. The 640×480 browser and confirmation were visually
+inspected for readable identity, path and keyboard controls.
 
 ## Limits
 
 No real OS, physical machine, Secure Boot rejection, nonempty child ExitData,
-initrd/kernel command line or multiple ESP discovery has been demonstrated.
+initrd/kernel command line, multiple physical disks or hot-plug behavior has been
+demonstrated. Multiple ESPs on a virtual GPT disk are covered.
 Editor preferences persist in TOML; NVRAM preferences are not implemented.
 The editor cannot create the first configuration or repair raw malformed TOML;
 a valid backup can be restored explicitly. FAT rename is not power-loss atomic. Input is polled; the timeout itself uses a
 firmware timer. Timer creation/check failures and allocation exhaustion are
 handled but not fault-injected. Automatic GOP failure fallback is not injected;
 manual text fallback is tested. Only printable ASCII labels/paths are supported.
-Both directory-backed FAT and a virtual single-ESP GPT disk are exercised;
-this does not demonstrate discovery across multiple ESPs.
+Directory-backed FAT, single-ESP GPT and multiple-ESP GPT are exercised. MBR,
+superfloppy and firmware lacking PartitionInfo remain unsupported for discovery.
+The target-count limit is exercised; exhaustive directory/depth/read-budget and
+I/O fault injection is still outstanding. Exact copies of the current on-disk
+binary are excluded; different builds/signed copies are not. Persisting discovered
+cross-volume choices in TOML is not implemented.
 See ARCHITECTURE.md for loader cleanup and self-copy limitations.
 
 Artifact SHA-256 for this build:
 
 ```text
-0041301ccd955bbbd81e964f00701c274786cee43da2e45459e10699abd7f14e  artifacts/EutherBoot.efi
-3528b88ea4cc535bd68693a3d5e315069facae07a895aba3ae9d8c87222f970e  artifacts/TestChild.efi
+02135ee849366b9fe572a5c873e85f9337786e5b4272dab5cef0afa9843cc119  artifacts/EutherBoot.efi
+788bc2acd5f2bf3e228885be1f91a29e84df53b5843546d7987c72918989c1f8  artifacts/TestChild.efi
 ```
