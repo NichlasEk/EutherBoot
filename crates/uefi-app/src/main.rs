@@ -9,6 +9,7 @@ mod graphics;
 mod image_services;
 mod images;
 mod initrd;
+mod input;
 mod linux;
 mod loader;
 mod storage;
@@ -17,7 +18,6 @@ mod volumes;
 use alloc::{format, string::String, vec::Vec};
 use boot_core::Menu;
 use uefi::{
-    boot,
     prelude::*,
     proto::console::text::{Key, ScanCode},
     system,
@@ -260,7 +260,7 @@ fn session(allow_timeout: bool) -> Option<Status> {
             trace(&format!("SELECT {}", menu.selected));
             text = render(&labels, &menu, &notice, text);
         } else {
-            boot::stall(core::time::Duration::from_millis(10));
+            input::idle(timer.as_ref());
         }
     }
 }

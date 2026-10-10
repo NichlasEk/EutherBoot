@@ -384,3 +384,12 @@ is retained:
 e5aeba5e876682fdc3648e09fbeb06eea260aae1ddac5b15c19fe0fbcfc38b63  artifacts/EutherBoot.efi
 c8b2aa005a71407c6d9f805e9f19c83e5a47adf3d42f009d075744e1992f0b90  artifacts/TestChild.efi
 ```
+
+## Event-driven input and GPL-3.0-only
+
+The menu, editor and discovery now wait on firmware keyboard events. Timer
+signals consumed by WaitForEvent are retained; a queued key still takes priority
+over automatic boot. Broken event firmware falls back to polling with a diagnostic.
+All 25 core tests and 48 ordinary OVMF cases passed after this change, including
+timeout firing/cancellation, return paths, editors and cross-volume discovery.
+The owner selected GPL-3.0-only; Cargo metadata and LICENSE now declare it.

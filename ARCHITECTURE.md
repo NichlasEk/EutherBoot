@@ -216,7 +216,8 @@ No bootloader source code was copied.
   requires preserving notices if code is reused.
 
 font8x8 0.3.1 declares MIT. Retain dependency notices for future binary distribution.
-The project's own distribution license remains an owner decision.
+The project is GPL-3.0-only, selected by the owner. Preserve dependency licenses
+and provide corresponding source with distributed binaries.
 
 ## Hardware safety
 

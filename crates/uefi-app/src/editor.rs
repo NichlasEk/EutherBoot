@@ -7,19 +7,12 @@ use boot_core::{
     transaction::{self, Store},
 };
 use uefi::{
-    boot,
     proto::console::text::{Key, ScanCode},
     system,
 };
 
 fn key() -> Option<Key> {
-    loop {
-        match system::with_stdin(|s| s.read_key()) {
-            Ok(Some(k)) => return Some(k),
-            Ok(None) => boot::stall(core::time::Duration::from_millis(10)),
-            Err(_) => return None,
-        }
-    }
+    crate::input::read_blocking()
 }
 fn clear() {
     system::with_stdout(|s| {

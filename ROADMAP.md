@@ -3,7 +3,7 @@
 | Milestone | State | Required evidence |
 | --- | --- | --- |
 | A · First light | Demonstrated | EFI executable renders title/emblem in QEMU/OVMF; captures at 1024×768 and 640×480 |
-| B · First choice | Started | Arrow-key selection, wrap, Enter, F2 and return demonstrated; configured EFI entries and pagination now work; event-driven input remains |
+| B · First choice | Demonstrated in QEMU | Keyboard-event-driven menu/editor/discovery, arrow-key selection, wrap, Enter, F2, return and pagination; timer/key ordering verified |
 | C · First boot | Demonstrated in QEMU | Independent EFI child starts and returns; missing/invalid image and ABORTED cases preserve the menu |
 | D · Configuration | Demonstrated in QEMU | Shared Rust TOML parser, own-volume config reads, optional GPT partition selectors, strict validation, default and cancellable one-shot timeout |
 | E · Editor | Demonstrated in QEMU | Keyboard drafts, discovery import, partition selector editing, preview, confirmed save, backup and explicit recovery on GPT/FAT |
@@ -24,13 +24,13 @@ interruption cases. This is not yet a host installer or a complete recovery desi
 LTS integration and retained old kernel/module generations remain open.
 Secure Boot acceptance/rejection is demonstrated with disposable owner keys in
 OVMF, including a signed diagnostic UKI; production/hardware trust remains open.
-Event-based input, richer editor styling and Unicode remain refinements.
+Richer editor styling and Unicode remain refinements.
 
 C demonstrates a known unsigned application under ordinary OVMF, not arbitrary
 OS compatibility. Nonempty child ExitData is now freed and tested across repeated returns.
 Optional rejected-handle cleanup and resource-exhaustion behavior remain
 explicit compatibility gates. No physical installation is implied.
 
-Open questions: final project license, Unicode configuration/display policy,
+Open questions: Unicode configuration/display policy,
 removable-media policy, variable persistence contract, Secure Boot trust model,
 initrd authentication policy, localization, and physical power-loss behavior of configuration saves.

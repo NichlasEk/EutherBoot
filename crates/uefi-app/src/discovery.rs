@@ -393,11 +393,5 @@ fn browse(picking: bool) -> Option<Selection> {
     }
 }
 fn key() -> Option<Key> {
-    loop {
-        match system::with_stdin(|stdin| stdin.read_key()) {
-            Ok(Some(key)) => return Some(key),
-            Err(_) => return None,
-            Ok(None) => boot::stall(core::time::Duration::from_millis(10)),
-        }
-    }
+    crate::input::read_blocking()
 }

@@ -442,3 +442,8 @@ prototype; physical installation requires separate approval and rollback plannin
 Fault-injection tests use the separate `EutherBoot-faults.efi` artifact. Its
 `test-faults` feature is excluded from the normal binary. Test scripts create
 only temporary image files; they do not accept a physical disk destination.
+
+## License
+
+EutherBoot is licensed under [GNU GPL version 3](LICENSE), SPDX `GPL-3.0-only`.
+Copyright (C) 2026 EutherBoot contributors. Dependencies retain their own licenses.
