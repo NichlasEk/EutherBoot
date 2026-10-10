@@ -30,3 +30,18 @@ screenshots, the original fallback readback and result metadata, not private key
 The fixture does not prove arbitrary physical power-loss atomicity, all Arch
 storage/encryption layouts, userspace rollback or production Secure Boot trust.
 Generation prune protections are tested separately in `tests/installer/`.
+
+`--layout btrfs-at-udev` selects the additional layout described in
+[the compatibility gate](../../../docs/HOST-COMPATIBILITY.md): FAT `/boot`, Btrfs
+`@`, separately mounted swap subvolume and udev default/fallback initramfs images.
+A temporary filler leaves approximately 419 MiB free before an installation
+attempt; the payload-based budget must refuse before creating any integration
+file, EFI installation or journal. The filler is then removed for the positive
+installation/recovery tests. No host files are used as kernel/initramfs inputs.
+
+`python3 scripts/test-arch-hooks.py` is a separate offline libalpm test. It installs
+a synthetic package containing an external-module directory and records real
+pre/post hook invocation. A refused second transaction must retain the original
+package/version/payload. Exec commands are replaced with assertion oracles and
+upstream mkinitcpio generation is disabled only inside that disposable guest;
+this validates trigger/AbortOnFail semantics, not NVIDIA driver operation.

@@ -58,6 +58,20 @@ def esp_check(path,guid,require_space=True,minimum_free=8*1024**2):
     if (path/'EFI').is_symlink():raise RuntimeError('EFI directory must not be a symlink')
     return mount
 
+def arch_capacity(boot=Path('/boot')):
+    """Budget current + immutable recovery + stable recovery, staging and headroom.
+
+    Existing boot files are retained. This estimate cannot predict future kernel
+    growth; publication also checks the actual completed UKI before copying it.
+    """
+    sizes=[]
+    for package in ('linux','linux-lts'):
+        kernel=boot/f'vmlinuz-{package}';initrd=boot/f'initramfs-{package}.img'
+        if not kernel.is_file() or not initrd.is_file():
+            raise RuntimeError(f'Missing {package} kernel/initramfs; build both before installation')
+        sizes.append(kernel.stat().st_size+initrd.stat().st_size+8*1024**2)
+    return 3*sum(sizes)+max(sizes)+384*1024**2
+
 def arch_files(args):
     root=args.arch_files.resolve()
     if not args.cmdline:raise RuntimeError('--cmdline is required for Arch integration')
@@ -115,13 +129,15 @@ def install(args):
     configuration=args.config.read_text()
     if '\\EFI\\EutherBoot\\EutherBoot.efi'.lower() in configuration.lower():raise RuntimeError('Configuration points to EutherBoot itself')
     files=arch_files(args) if args.arch else {}
+    if args.arch:
+        esp_check(args.esp,args.esp_guid,minimum_free=arch_capacity())
     for path in files:
         if path.is_symlink():raise RuntimeError(f'Refusing symlink: {path}')
         if path.exists() and not str(path).startswith('/etc/mkinitcpio.d/'):
             raise RuntimeError(f'Existing integration file: {path}')
     plan={'action':'install','esp':str(args.esp),'esp_partuuid':args.esp_guid,
           'efi':str(target/'EutherBoot.efi'),'image_sha256':digest(args.image),
-          'root_files':[str(p) for p in files],'arch_integration':args.arch,
+          'root_files':[str(p) for p in files],'state_journal':str(MANIFEST),'arch_integration':args.arch,
           'firmware_variables':'unchanged','existing_loaders':'unchanged'}
     print(json.dumps(plan,indent=2),flush=True)
     if not args.apply:return

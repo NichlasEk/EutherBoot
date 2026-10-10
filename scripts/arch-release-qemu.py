@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Arch installation, LTS, retained-module recovery, Secure Boot and uninstall."""
+import argparse
 import hashlib
 import json
 import os
@@ -12,11 +13,19 @@ import tempfile
 import threading
 import time
 from qemu_test import VM, VARS
-from guest_console import command, wait, drain
+from guest_console import command as guest_command, wait, drain
 import virtual_disk
 
 ROOT=Path(__file__).resolve().parent.parent
-OUT=ROOT/'artifacts/arch-release';OUT.mkdir(parents=True,exist_ok=True)
+parser=argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--layout',choices=('stock','btrfs-at-udev'),default='stock')
+args=parser.parse_args()
+host_layout=args.layout=='btrfs-at-udev'
+def mount_paths(text):
+    return re.sub(r'(?<![\w/.-])/eutherboot(?=/|[ ;\"\'\n]|$)', '/boot', text) if host_layout else text
+def command(v,serial,script,timeout=180):
+    return guest_command(v,serial,mount_paths(script),timeout)
+OUT=ROOT/('artifacts/arch-host-layout' if host_layout else 'artifacts/arch-release');OUT.mkdir(parents=True,exist_ok=True)
 (OUT/'result.json').unlink(missing_ok=True)
 FIXTURES=ROOT/'artifacts/arch'
 manifest=json.loads((FIXTURES/'manifest.json').read_text())
@@ -53,7 +62,9 @@ with tempfile.TemporaryDirectory(prefix='eutherboot-release-') as directory:
     shutil.copy2(ROOT/'artifacts/release/config-check',payload/'config-check')
     shutil.copy2(ROOT/'artifacts/EutherBoot.efi',payload/'EutherBoot.efi')
     shutil.copy2(ROOT/'artifacts/release/EutherBoot.efi',payload/'Release.efi')
-    shutil.copy2(ROOT/'tests/arch/release/setup.sh',payload/'setup.sh')
+    (payload/'setup.sh').write_text(mount_paths((ROOT/'tests/arch/release/setup.sh').read_text()))
+    (payload/'layout').write_text(args.layout+'\n')
+    if host_layout:cmdline=cmdline.replace('rootflags=compress=zstd:1','rootflags=subvol=@,compress=zstd:3')
     (payload/'cmdline').write_text(cmdline+'\n')
     entries=[('linux','Arch Linux','linux'),('linux-lts','Arch Linux LTS','linux-lts'),
              ('previous','Previous Linux with retained modules','linux-previous'),
@@ -95,17 +106,26 @@ with tempfile.TemporaryDirectory(prefix='eutherboot-release-') as directory:
                 wait(v,r'\[arch@[^\r\n]+\]\$ ')
                 serial.sendall(b'stty -echo; export SYSTEMD_COLORS=0 SYSTEMD_URLIFY=0 TERM=dumb\n');time.sleep(.3)
                 if iteration==1:
-                    command(v,serial,'sudo mkdir -p /eutherboot; sudo mount /dev/vdc1 /eutherboot; sudo bash /eutherboot/EFI/TestPayload/setup.sh',timeout=2400)
+                    if host_layout:
+                        guest_command(v,serial,'sudo mkdir -p /eutherboot; sudo mount /dev/vdc1 /eutherboot; sudo cp /boot/vmlinuz-linux /boot/initramfs-linux.img /eutherboot/; sudo umount /eutherboot; sudo mount /dev/vdc1 /boot; sudo bash /boot/EFI/TestPayload/setup.sh',timeout=2400)
+                    else:
+                        command(v,serial,'sudo mkdir -p /eutherboot; sudo mount /dev/vdc1 /eutherboot; sudo bash /eutherboot/EFI/TestPayload/setup.sh',timeout=2400)
                 else:
+                    if host_layout:
+                        command(v,serial,'test "$(findmnt -n -o FSROOT /)" = /@; test "$(findmnt -n -T /boot -o FSTYPE)" = vfat')
                     expected='linux-lts' if index==1 else 'linux'
                     version_file='/var/lib/eutherboot/generations/linux-original/version' if index==4 else f'/var/lib/eutherboot/test-{expected}-version'
                     log=command(v,serial,f'''test "$(uname -r)" = "$(cat {version_file})"
 test "$(cat /proc/1/comm)" = systemd
-test "$(findmnt -n -o SOURCE /)" = /dev/vdb3
+test "$(findmnt -n --nofsroot -o SOURCE /)" = /dev/vdb3
 for attempt in $(seq 1 90); do systemctl is-active --quiet multi-user.target && break; sleep 1; done
 systemctl is-active --quiet multi-user.target
 systemctl --failed --no-legend --no-pager
-test -z "$(systemctl --failed --no-legend --no-pager)"
+if test -n "$(systemctl --failed --no-legend --no-pager)"; then
+    systemctl status --failed --no-pager || true
+    journalctl -b -p err --no-pager || true
+    exit 1
+fi
 printf '\\nRUNNING_KERNEL=%s\\nBOOT_ID=%s\\n' "$(uname -r)" "$(cat /proc/sys/kernel/random/boot_id)"
 sudo modprobe dummy
 modinfo -F vermagic dummy
@@ -159,7 +179,7 @@ test ! -e /etc/pacman.d/hooks/05-eutherboot.hook
     run('mcopy','-o','-i',f'{disk}@@1048576','::/EFI/BOOT/BOOTX64.EFI',readback)
     assert sha(readback)==original_loader
     assert sha(image)==manifest['image_sha256']
-(OUT/'result.json').write_text(json.dumps({'boots':boots,'original_image_unchanged':True,
+(OUT/'result.json').write_text(json.dumps({'capacity_refusal_before_mutation':True,'layout':args.layout,'boots':boots,'original_image_unchanged':True,
     'original_loader_unchanged':True,'secure_boot':'disposable owner key; installed normal, LTS and recovery UKIs',
     'install_remove':'plan read-only; explicit apply; original fallback booted',
     'release_upgrade':'signed non-instrumented EFI; automatic LTS boot; empty debug trace'},indent=2)+'\n')

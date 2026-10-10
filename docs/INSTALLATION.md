@@ -44,7 +44,9 @@ through the system's normal full-upgrade process before requesting integration.
 Separate `/usr` and `/var` filesystems are refused. Encrypted roots, custom
 presets, other kernel package names and other distributions are not established
 compatibility claims. Keep ample root and ESP free space; a 1 GiB ESP is used in
-the automated test, and saved generations continue consuming space.
+the automated test, and saved generations continue consuming space. The installer now budgets from
+actual kernel/initramfs sizes; 384 MiB is only a minimum guard, not sufficient
+capacity for large GPU initramfs images. See [host compatibility](HOST-COMPATIBILITY.md).
 
 Add `--arch --cmdline your-kernel-command-line.txt` to the installation command.
 The file must contain one explicit line appropriate for this root filesystem.

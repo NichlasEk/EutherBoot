@@ -27,6 +27,8 @@ retains matching kernel modules, publishes UKIs at stable paths, supports option
 owner-key signing, and provides removal with preset restoration. See the
 [installation and rollback guide](docs/INSTALLATION.md) for scope and restrictions.
 Physical deployment is not part of the automatic test environment.
+Run `python3 scripts/audit-host.py` for a read-only inventory; see the
+[Arch host compatibility gate](docs/HOST-COMPATIBILITY.md).
 
 ```sh
 bash scripts/package-release.sh  # non-instrumented EFI and installation tools

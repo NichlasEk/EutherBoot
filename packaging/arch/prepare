@@ -2,36 +2,36 @@
 # SPDX-License-Identifier: GPL-3.0-only
 source /usr/local/lib/eutherboot/common.sh
 check_esp
+check_update_capacity
 [[ -x /usr/lib/systemd/ukify ]] || fail 'systemd-ukify must be installed before enabling the update hook'
 [[ $(cat /proc/cmdline) != *eutherboot.recovery=* ]] || fail 'kernel updates are disabled while booted in recovery; select the normal or LTS entry first'
 mkdir -p "$STATE/generations" "$STATE/pending"
 exec 9>/run/eutherboot-generation.lock; flock -n 9 || fail 'another generation operation is running'
 # Capture both managed kernels; a dependency/microcode rebuild can affect either.
 for package in linux linux-lts; do
-    for modules in /usr/lib/modules/*; do
-        [[ -f $modules/pkgbase && $(cat "$modules/pkgbase") == "$package" ]] || continue
-        version=${modules##*/}; valid_token "$version" || fail 'invalid kernel version'
-        [[ ! -e $STATE/pending/$package ]] || fail "pending $package generation: repair with mkinitcpio -P before another update"
-        [[ -f $modules/vmlinuz && -f /boot/initramfs-$package.img ]] || fail "missing original $package boot payload"
-        [[ $(findmnt -n -T "$STATE" -o MAJ:MIN) == $(findmnt -n -T /usr/lib/modules -o MAJ:MIN) ]] || fail 'recovery archive and modules must share the root filesystem'
-        needed=$(du -sb "$modules" | cut -f1)
-        free=$(df -B1 --output=avail "$STATE" | tail -1)
-        (( free > needed + 256*1024*1024 )) || fail 'insufficient root space for a recovery generation'
-        generation="$package-$(cat /proc/sys/kernel/random/uuid)"
-        temporary=$(mktemp -d "$STATE/generations/.new.XXXXXXXX")
-        cp -a --reflink=auto "$modules" "$temporary/modules"
-        cp --reflink=auto "/boot/initramfs-$package.img" "$temporary/initrd.img"
-        printf '%s\n' "$version" > "$temporary/version"
-        printf '%s\n' "$package" > "$temporary/package"
-        [[ $(cat /etc/eutherboot/cmdline) != *eutherboot.recovery=* ]] || fail 'recovery option in normal command line'
-        printf '%s eutherboot.recovery=%s\n' "$(cat /etc/eutherboot/cmdline)" "$generation" > "$temporary/cmdline"
-        (cd "$temporary"; find . -type f ! -name SHA256SUMS -print0 | LC_ALL=C sort -z | xargs -0 sha256sum) > "$temporary/SHA256SUMS"
-        sync -f "$temporary"
-        mv "$temporary" "$STATE/generations/$generation"
-        printf '%s\n' "$generation" > "$STATE/pending/$package.new"
-        mv "$STATE/pending/$package.new" "$STATE/pending/$package"
-        sync -f "$STATE"
-        make_recovery "$generation" "$package"
-        echo "EUTHERBOOT_GENERATION_SAVED $package $version $generation"
-    done
+    modules=$(installed_modules "$package")
+    version=${modules##*/}; valid_token "$version" || fail 'invalid kernel version'
+    [[ ! -e $STATE/pending/$package ]] || fail "pending $package generation: repair with mkinitcpio -P before another update"
+    [[ -f $modules/vmlinuz && -f /boot/initramfs-$package.img ]] || fail "missing original $package boot payload"
+    cmp -s "$modules/vmlinuz" "/boot/vmlinuz-$package" || fail "installed $package kernel differs from /boot; repair before updating"
+    [[ $(findmnt -n -T "$STATE" -o MAJ:MIN) == $(findmnt -n -T /usr/lib/modules -o MAJ:MIN) ]] || fail 'recovery archive and modules must share the root filesystem'
+    needed=$(du -sb "$modules" | cut -f1)
+    free=$(df -B1 --output=avail "$STATE" | tail -1)
+    (( free > needed + 256*1024*1024 )) || fail 'insufficient root space for a recovery generation'
+    generation="$package-$(cat /proc/sys/kernel/random/uuid)"
+    temporary=$(mktemp -d "$STATE/generations/.new.XXXXXXXX")
+    cp -a --reflink=auto "$modules" "$temporary/modules"
+    cp --reflink=auto "/boot/initramfs-$package.img" "$temporary/initrd.img"
+    printf '%s\n' "$version" > "$temporary/version"
+    printf '%s\n' "$package" > "$temporary/package"
+    [[ $(cat /etc/eutherboot/cmdline) != *eutherboot.recovery=* ]] || fail 'recovery option in normal command line'
+    printf '%s eutherboot.recovery=%s\n' "$(cat /etc/eutherboot/cmdline)" "$generation" > "$temporary/cmdline"
+    (cd "$temporary"; find . -type f ! -name SHA256SUMS -print0 | LC_ALL=C sort -z | xargs -0 sha256sum) > "$temporary/SHA256SUMS"
+    sync -f "$temporary"
+    mv "$temporary" "$STATE/generations/$generation"
+    printf '%s\n' "$generation" > "$STATE/pending/$package.new"
+    mv "$STATE/pending/$package.new" "$STATE/pending/$package"
+    sync -f "$STATE"
+    make_recovery "$generation" "$package"
+    echo "EUTHERBOOT_GENERATION_SAVED $package $version $generation"
 done

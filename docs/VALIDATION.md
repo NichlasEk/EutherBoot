@@ -441,3 +441,24 @@ Validated EFI hashes (the release package manifest includes all distribution fil
 3b1d1026a7de035537df5da12e5fb83f6fcd931601bc816effe968b5332bc5eb  artifacts/EutherBoot.efi
 c674a24b4b5fc15793fd6775bd0a725599a4cbde753708b66e9c76cd18e6d823  artifacts/release/EutherBoot.efi
 ```
+
+## Host inventory and Arch update guards
+
+Read-only inventory identified FAT `/boot`, Btrfs `@`, udev initramfs, explicit
+NVIDIA modules, multiple retained `pkgbase=linux` trees and insufficient free ESP
+space for the managed UKI/recovery layout. Machine-specific details and a read-only
+plan for chainloading the existing loader are kept under ignored `artifacts/`.
+No host packages, boot files, hooks or firmware variables were changed.
+
+Twelve installer tests now pass, including payload-based sizing for a 257 MiB
+synthetic initramfs and preserving the active EFI file when actual staging space
+is insufficient. These use temporary sparse files and controlled capacity/image
+oracles. Installed-module selection now uses pacman's ownership list and checks
+that its kernel matches `/boot`.
+
+`artifacts/arch-hooks/result.json` records a passing offline Arch test with actual
+pacman/libalpm: an external-module path triggers pre and post hooks, and a failing
+pre-hook prevents the second package transaction from replacing the installed
+version/payload. The hooks' Exec commands are assertion oracles in this fixture;
+real NVIDIA/DKMS operation remains untested. The signed base image and read-only
+virtual ESP were unchanged.

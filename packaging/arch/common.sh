@@ -19,6 +19,32 @@ check_esp() {
         (( free > 384*1024*1024 )) || fail 'less than 384 MiB free on ESP'
     fi
 }
+installed_modules() {
+    local package=$1 owned
+    local -a candidates
+    owned=$(pacman -Qlq "$package") || fail "cannot enumerate installed $package files"
+    mapfile -t candidates < <(printf '%s\n' "$owned" | grep -E '^/usr/lib/modules/[a-zA-Z0-9._+-]+/pkgbase$')
+    (( ${#candidates[@]} == 1 )) || fail "ambiguous installed $package module directory"
+    [[ -f ${candidates[0]} && $(cat "${candidates[0]}") == "$package" ]] || fail 'installed module package identity mismatch'
+    printf '%s\n' "${candidates[0]%/pkgbase}"
+}
+
+check_update_capacity() {
+    local package kernel initrd size total=0 largest=0 free required
+    for package in linux linux-lts; do
+        kernel="/boot/vmlinuz-$package"; initrd="/boot/initramfs-$package.img"
+        [[ -f $kernel && -f $initrd ]] || fail "missing $package boot payload"
+        size=$(( $(stat -c %s "$kernel") + $(stat -c %s "$initrd") + 8*1024*1024 ))
+        total=$((total+size))
+        if (( size > largest )); then largest=$size; fi
+    done
+    # Both immutable generations grow the ESP; stable/current replacement needs
+    # a complete temporary copy while the previous target remains intact.
+    required=$((total + 2*largest + 384*1024*1024))
+    free=$(df -B1 --output=avail "$ESP_MOUNT" | tail -1)
+    (( free >= required )) || fail "insufficient ESP capacity for retained generations: need $required bytes, available $free"
+}
+
 check_generation() {
     local generation=$1
     valid_token "$generation" || fail 'invalid generation'
@@ -28,6 +54,10 @@ check_generation() {
 publish_file() {
     local source=$1 target=$2 temporary
     [[ $(bootctl kernel-identify "$source") == uki ]] || fail 'not a UKI'
+    local free needed
+    free=$(df -B1 --output=avail "$(dirname "$target")" | tail -1)
+    needed=$(( $(stat -c %s "$source") + 64*1024*1024 ))
+    (( free >= needed )) || fail 'insufficient ESP capacity for complete UKI staging; active target retained'
     temporary=$(mktemp "${target}.new.XXXXXXXX")
     if ! cp "$source" "$temporary" || ! cmp "$source" "$temporary" || ! sync -f "$temporary"; then
         rm -f "$temporary"; fail 'staging UKI failed; active target retained'
