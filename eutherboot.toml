@@ -1,12 +1,13 @@
-# Milestone D proposal: this file is not yet read by the EFI application.
-# No installed operating system or physical ESP is assumed.
+# Loaded from \EFI\EutherBoot\eutherboot.toml on EutherBoot's own volume.
+# Example for the disposable QEMU environment; not a host OS configuration.
 [boot]
-default = "firmware"
+default = "test"
 timeout = 0
-# Zero means wait for an explicit selection.
+# Zero waits indefinitely. Any key cancels a positive timeout.
 theme = "system-regis"
 
 [[entry]]
-id = "firmware"
-name = "UEFI Firmware Settings"
-type = "firmware"
+id = "test"
+name = "EFI test application"
+type = "efi"
+path = '\EFI\EutherBoot\TestChild.efi'

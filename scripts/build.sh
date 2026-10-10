@@ -2,6 +2,7 @@
 set -euo pipefail
 source "$(dirname "$0")/env.sh"
 cargo test -p boot-core --locked
+cargo run -p config-check --locked -- eutherboot.toml
 cargo build -p eutherboot --release --features qemu-debug --target x86_64-unknown-uefi --locked
 cargo build -p eutherboot-test-child --release --target x86_64-unknown-uefi --locked
 mkdir -p artifacts

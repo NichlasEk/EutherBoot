@@ -2,75 +2,109 @@
 
 **The machine belongs to its owner.**
 
-An independent Rust-first UEFI boot environment for x86_64. Local control,
-private by design, freedom through understanding. No network, telemetry or services.
+A Rust-first x86_64 UEFI boot environment. Local control, private by design,
+freedom through understanding. No runtime network, telemetry or cloud services.
 
-This is a working **UEFI chainloading prototype**, not yet an OS bootloader.
-It displays a restrained navy/gold interface with an original geometric
-three-crowns-and-sword emblem, accepts keyboard input, and chainloads an
-independent EFI test application. Returned children and load errors restore
-the menu. It can also return to firmware.
-It does not discover or launch installed operating systems yet.
+The current prototype reads TOML from its own EFI volume, validates it strictly,
+displays configured EFI targets, and chainloads the selected application. It has
+configurable default/timeout, keyboard navigation, paginated menus and firmware
+text fallback. A separate EFI child demonstrates returning success and failure.
+No installed operating system, physical hardware or Secure Boot has been tested.
 
-## Run locally
+## Build and run
 
 Requirements: Rust with `x86_64-unknown-uefi`, Python 3.11+, QEMU x86_64 and OVMF.
-The initial build was tested with Rust 1.99.0, uefi-rs 0.40.0 and the committed
-Cargo.lock. Install the target with `rustup target add x86_64-unknown-uefi`.
-The scripts also recognize an isolated rustup installation under `.tools/`.
+Tested with Rust 1.99.0 and QEMU 11.1.2. Cargo.lock pins dependencies. Install the
+target with `rustup target add x86_64-unknown-uefi`. Scripts also recognize the
+isolated rustup installation under `.tools/` without changing the host compiler.
 
 ```sh
 ./scripts/build.sh
-python3 scripts/qemu.py          # interactive QEMU window
-./scripts/test.sh                # host checks + five headless OVMF runs
+python3 scripts/qemu.py                 # interactive window
+./scripts/validate-config.sh eutherboot.toml
+./scripts/test.sh                       # shared Rust tests + 20 OVMF cases
 ```
 
 Override `OVMF_CODE` and `OVMF_VARS` if needed. Defaults are Arch Linux's
 `/usr/share/edk2/x64/OVMF_{CODE,VARS}.4m.fd`; use a matching firmware pair.
-All VM storage is generated inside a unique temporary directory. The runner
-copies the EFI executable to a disposable FAT volume's `EFI/BOOT/BOOTX64.EFI`
-and the independent child to `EFI/EutherBoot/TestChild.efi`, then copies OVMF variables. No host disk, ESP, firmware variables or network
-interface is exposed. Temporary storage is removed when QEMU exits.
+The QEMU runner copies the binary, config and test child into a unique disposable
+FAT directory, and copies the firmware variable store. It attaches no host disk,
+ESP or network interface. Exiting the runner removes the temporary storage.
 
-Binaries: `artifacts/EutherBoot.efi` and `artifacts/TestChild.efi`; checksums:
-`artifacts/SHA256SUMS`. The child is a QEMU-only fixture, not an OS or installer.
-Screenshots and logs: `artifacts/qemu-<width>x<height>-<scenario>/`.
-The test build enables the `qemu-debug` feature (debugcon port 0xe9).
-A normal EutherBoot Cargo build without that feature contains no debug-port writes.
-The QEMU-only test child always emits debugcon markers.
+Binaries: `artifacts/EutherBoot.efi`, `artifacts/TestChild.efi`.
+Checksums: `artifacts/SHA256SUMS`.
+Logs/screenshots: `artifacts/qemu-<width>x<height>-<scenario>-<config-case>/`.
+Artifacts, target output and local tools are intentionally ignored by Git.
+The supplied build enables EutherBoot's `qemu-debug` feature (port 0xe9).
+Normal builds without this feature have no debug-port writes. The independent
+test child is QEMU-only and always emits diagnostic markers.
+
+## Configuration
+
+Firmware reads **only** `\EFI\EutherBoot\eutherboot.toml` from the volume that
+contains EutherBoot. No search across disks or fallback to another config occurs.
+The QEMU runner copies the repository's `eutherboot.toml` there for normal runs.
+The host validator and firmware use the same no_std Rust parser and schema.
+
+```toml
+[boot]
+default = "test"
+timeout = 0
+theme = "system-regis"
+
+[[entry]]
+id = "test"
+name = "EFI test application"
+type = "efi"
+path = '\EFI\EutherBoot\TestChild.efi'
+```
+
+`default` must match a unique entry ID. `timeout` is 0..3600 seconds; zero or
+omission means wait indefinitely. The only supported theme is `system-regis`
+(the default). A positive timeout starts the default once, after the initial
+menu appears. **Any key cancels it**, including keys with no other action.
+Load failures and returning children retain the menu and never restart the timer.
+
+The entire configuration is rejected for unknown fields, invalid TOML/UTF-8,
+unsupported types/themes, missing/duplicate IDs, duplicate case-insensitive
+paths, an unresolved default or a reference to EutherBoot's own loaded path.
+On error, no configured targets are enabled and no timer is armed; the error
+appears in text mode with read-only inspection and return-to-firmware available.
+The host checker cannot verify firmware-specific self-reference or file existence.
+
+Current bounds: 16 KiB input, 1..16 EFI entries, IDs of 1..32 ASCII letters,
+digits, `-` or `_`, printable ASCII names of 1..48 characters, and ASCII paths
+up to 240 bytes. Paths must start with `\EFI\`, end in `.efi`, and cannot use
+traversal, empty components, whitespace, wildcards or short-name `~` aliases.
+These restrictions make the initial graphical renderer/path handling explicit.
+Unicode entry names, other themes and `type = "firmware"` are **not implemented**;
+unsupported values produce errors. The built-in firmware-return action simply
+returns to the caller; it does not open firmware settings or change BootOrder.
 
 ## Controls
 
-- Up/Down: select, wrapping at either end.
-- Enter: start the EFI test application, inspect the editor placeholder, or return to firmware.
-- Inside the child: Enter returns SUCCESS; Escape returns ABORTED to EutherBoot.
-- F2: switch to firmware text output for the remainder of this run.
+- Up/Down: select, with wrapping and automatic page changes.
+- Enter: start the selected EFI entry, inspect configuration or return to firmware.
+- F2: use firmware text output for the remainder of the run.
 - Escape: return to the firmware caller.
+- In the test child: Enter returns SUCCESS; Escape returns ABORTED.
 
-“Return to firmware” returns EFI_SUCCESS; it does not request firmware settings
-or change BootOrder. What appears next is decided by the caller.
-There is no timeout or automatic activation in this prototype.
+Configuration inspection is read-only and also switches to text mode. There is
+no configuration editor, persistent preference save or installer yet.
 
-`eutherboot.toml` is a **proposed schema**, validated on the host by
-`python3 scripts/validate-config.py`. The EFI application does not read it yet.
-There is no configuration editor or persistent write operation yet.
-
-See [architecture](ARCHITECTURE.md), [roadmap](ROADMAP.md), and
-[validation evidence](docs/VALIDATION.md). Physical installation is not provided;
-this binary is for the disposable virtual environment only at this stage.
-
-## Chainloading regression cases
+## Focused virtual tests
 
 ```sh
-python3 scripts/qemu.py --test --scenario return
-python3 scripts/qemu.py --test --scenario abort
 python3 scripts/qemu.py --test --scenario missing
 python3 scripts/qemu.py --test --scenario invalid
+python3 scripts/qemu.py --test --scenario abort
+python3 scripts/qemu.py --test --config-case default
+python3 scripts/qemu.py --test --config-case timeout
+python3 scripts/qemu.py --test --config-case cancel
+python3 scripts/qemu.py --test --config-case unknown
+python3 scripts/qemu.py --test --config-case many --width 640 --height 480
 ```
 
-Each run makes three explicit attempts in one VM, including one in text mode.
-The child displays its own screen and waits for a key. Tests verify its execution
-markers, return status, released image handle, reconstructed menu pixels and
-continued input. Missing/corrupt fixtures must never execute a child. Full test
-coverage also runs the successful case at 640×480. No automatic retries occur
-in EutherBoot itself; every attempt comes from an injected Enter key.
+See [architecture](ARCHITECTURE.md), [roadmap](ROADMAP.md) and
+[validation evidence](docs/VALIDATION.md). This remains a virtual-development
+prototype; physical installation requires separate approval and rollback planning.

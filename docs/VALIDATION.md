@@ -1,64 +1,72 @@
-# Validation · 2026-10-10
+# Validation · 2026-10-10 · Configuration milestone
 
-Demonstrated on the host with QEMU 11.1.2 TCG, q35, OVMF and disposable FAT-backed
-virtual storage. This is not physical hardware or OS-boot evidence.
+Host: Rust 1.99.0, QEMU 11.1.2 TCG/q35, ordinary OVMF, x86_64 UEFI target.
+This is virtual-development evidence, not physical hardware or OS boot evidence.
 
-## First light and menu
+## Shared parser and builds
 
-- Rust 1.99.0, uefi-rs 0.40.0; release x86_64-unknown-uefi build succeeded.
-- Two Rust menu tests passed: wrap behavior and empty-menu navigation.
-- Four Python schema tests cover the proposal, unresolved default, unknown keys,
-  invalid timeout/theme, duplicate IDs and path traversal rejection.
-- OVMF booted EutherBoot from EFI/BOOT/BOOTX64.EFI.
-- GOP rendering and manual text fallback work at 1024×768 and 640×480.
-- Up/Down wrap selection. The configuration placeholder stays in the menu.
-- Enter on the return entry returns EFI_SUCCESS to firmware, not firmware settings.
+Nine Rust tests cover menu wrap/empty state, the example and safe defaults,
+non-first defaults, positive timeouts, malformed TOML, unknown/duplicate fields,
+bad types/ranges/themes, duplicate IDs and case-insensitive paths, unsupported
+entry types, traversal/aliases, display controls/Unicode and resource bounds.
+The host CLI validates the same example with the same no_std parser as firmware.
+Both real PE32+ EFI executables build with Cargo.lock, including the parser.
 
-## Chainloading
+## OVMF matrix
 
-The child is a separately linked PE32+ EFI application at
-`EFI/EutherBoot/TestChild.efi` on the temporary volume. Each scenario is attempted
-three times in one VM (twice graphical, once text), using actual QMP keyboard
-input. The runner verifies that no child executes before Enter.
+`./scripts/test.sh` builds/tests and runs **20 independent QEMU cases**. Each has
+its own generated FAT directory and firmware-variable copy, with no attached
+host disks or networking. At most three VMs run concurrently. Test steps have
+deadlines; an outer timeout interrupts the runner/VM process group.
 
-| Scenario | Resolution | Observed outcome |
+| Cases | Count | Verified outcome |
 | --- | --- | --- |
-| Valid child, Enter | 1024×768 | CHILD_STARTED, context present, SUCCESS, image released, menu redrawn |
-| Valid child, Enter | 640×480 | Same success and recovery checks |
-| Valid child, Escape | 1024×768 | Child returns ABORTED; status displayed; menu usable |
-| Missing file | 1024×768 | LoadImage NOT_FOUND; no child execution; menu usable |
-| Invalid file | 1024×768 | LoadImage UNSUPPORTED for non-PE data; no child execution; menu usable |
+| Sample, successful child at 1024×768 and 640×480 | 2 | TOML-loaded EFI target starts and returns; menu restored |
+| Child ABORTED, missing child, invalid child | 3 | Error retained on menu, no unintended target or retry |
+| Non-first configured default | 1 | Selection 1 loads a relocated child by its configured path |
+| 3s timeout | 1 | Default starts once after the delay; return never rearms it |
+| Any-key cancellation | 1 | Unhandled `x` cancels timeout; later explicit Enter works |
+| Timeout into missing default | 1 | NOT_FOUND once; no automatic fallback/retry |
+| Sixteen configured entries at both resolutions | 2 | Page navigation reaches entry 16, starts correct child and reaches built-ins |
+| Missing configuration | 1 | Read error, no configured entries or timer |
+| Malformed TOML, unknown field, duplicate ID, unresolved default, traversal | 5 | Entire config rejected; diagnostics and firmware return work |
+| Invalid UTF-8, oversize input, direct self-reference | 3 | Entire config rejected before any child starts |
 
-All five scenarios passed (15 explicit chainload attempts). The runner accepts
-LOAD_ERROR or UNSUPPORTED for invalid images, since firmware may classify these
-differently. Inspect debug.log for the exact firmware result.
+The original five chainload cases each perform three explicit attempts in one
+VM, including text mode. Positive configuration cases move the child away from
+the original fixed path; the selected target log and actual child execution
+prove the config path is used. The first non-default entry points to a missing
+file, making accidental selection observable. Timeout tests check a 3-second
+interval with host-observation tolerance and wait past the deadline again after
+return/failure to reject unintended rearming. Invalid configs request a 1-second
+timeout where syntactically possible; tests wait beyond it and require no load.
 
-Image checks compare the restored menu region with the initial frame after the
-child clears the screen. Text recovery checks console output, disappearance of
-the graphics canvas and working subsequent input. The child and restored graphical
-menu were also visually inspected. Handle-release markers confirm that the
-returning application no longer exposes LoadedImage; this is not a memory-leak audit.
+Screenshots confirm the configured default highlight, error diagnostics and the
+last page at 640×480. Pixel comparisons verify the graphical menu is reconstructed
+after the child clears the display. Text tests check new console output and
+subsequent keyboard navigation, not just log markers. Returning child handles
+no longer expose LoadedImage; this is not a complete memory-leak audit.
 
-Reproduce with `./scripts/test.sh`. Generated binaries, checksums, logs and PPM
-screenshots remain ignored under `artifacts/`. Each VM run uses
-`artifacts/qemu-<width>x<height>-<scenario>/`. The runner prepares a unique temporary
-FAT directory and writable OVMF-variable copy; none survives into another run.
-No host disks, ESP or network interface are attached.
+Reproduce individual cases through `scripts/qemu.py --help`. Evidence is ignored
+under `artifacts/qemu-<width>x<height>-<scenario>-<config-case>/`: debug.log,
+serial.log, qemu.log and PPM captures. `.efi` artifacts and SHA256SUMS are rebuilt
+by scripts/build.sh. The example config is copied read-only from EutherBoot's
+perspective; no runtime disk writes or firmware-variable writes were introduced.
 
-Not demonstrated: absent/broken GOP automatic fallback, text-console failure,
-allocation exhaustion, authentication-rejected images, nonempty child ExitData,
-OS booting, UEFI configuration reads, editor saves, preferences or hardware.
-The directory-backed FAT device does not test GPT enumeration or multiple ESPs.
-See ARCHITECTURE.md for the dependency cleanup limitations before Secure Boot work.
+## Limits
 
-Regression retained from A: opening GOP exclusively disconnected the firmware
-console, leaving the old graphical frame after F2 while text only reached serial.
-GET_PROTOCOL preserves the console driver. A pixel check now rejects stale
-navy graphics after F2 as well as requiring console output and continued input.
+No real OS, physical machine, Secure Boot rejection, nonempty child ExitData,
+initrd/kernel command line, multiple ESP discovery, editor save or persistent
+preferences have been demonstrated. Input is polled; the timeout itself uses a
+firmware timer. Timer creation/check failures and allocation exhaustion are
+handled but not fault-injected. Automatic GOP failure fallback is not injected;
+manual text fallback is tested. Only printable ASCII labels/paths are supported.
+The virtual filesystem is directory-backed FAT, not a GPT-enumeration test.
+See ARCHITECTURE.md for loader cleanup and self-copy limitations.
 
-Artifact SHA-256 from this validated build:
+Artifact SHA-256 for this build:
 
 ```text
-294d5371be595025eb9a4fa6e03664b749e0050c6ed1c0411ea81229d21667b1  artifacts/EutherBoot.efi
+37d7ae6c60a7b22664ccb9045187b6ce708ca3a8a26a7ccab1912e86e46b62d3  artifacts/EutherBoot.efi
 3528b88ea4cc535bd68693a3d5e315069facae07a895aba3ae9d8c87222f970e  artifacts/TestChild.efi
 ```

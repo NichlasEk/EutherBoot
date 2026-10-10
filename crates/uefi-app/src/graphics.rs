@@ -1,5 +1,5 @@
 use alloc::vec::Vec;
-use boot_core::ENTRIES;
+
 use font8x8::{BASIC_FONTS, UnicodeFonts};
 use uefi::{
     Status, boot,
@@ -58,7 +58,7 @@ impl Canvas {
         self.rect(x + 4 * s, y + 6 * s, 16 * s, 3 * s, GOLD);
     }
 }
-pub fn draw(selected: usize, notice: &str) -> Result<(), Status> {
+pub fn draw(labels: &[&str], selected: usize, notice: &str) -> Result<(), Status> {
     let handle = boot::get_handle_for_protocol::<GraphicsOutput>().map_err(|e| e.status())?;
     // SAFETY: single-threaded application; no driver disconnect/uninstall or
     // ExitBootServices while this borrow exists. No text-console calls occur
@@ -100,8 +100,10 @@ pub fn draw(selected: usize, notice: &str) -> Result<(), Status> {
     c.center(top + 90 * s, "EUTHERBOOT", s + 1, WHITE);
     let start = top + 114 * s;
     let left = cx - 220;
-    for (i, label) in ENTRIES.iter().enumerate() {
-        let y = start + i * 42;
+    let visible = ((h - 120 - start) / 42).max(1);
+    let first = selected / visible * visible;
+    for (i, label) in labels.iter().enumerate().skip(first).take(visible) {
+        let y = start + (i - first) * 42;
         if i == selected {
             c.rect(left, y, 440, 34, BltPixel::new(22, 43, 61));
             c.rect(left, y, 3, 34, GOLD);
@@ -115,7 +117,16 @@ pub fn draw(selected: usize, notice: &str) -> Result<(), Status> {
             if i == selected { WHITE } else { MUTED },
         );
     }
-    c.center(h - 95, notice, 1, MUTED);
+    let short: alloc::string::String = notice.chars().take((w - 64) / 8).collect();
+    c.center(h - 95, &short, 1, MUTED);
+    if labels.len() > visible {
+        c.center(
+            h - 115,
+            &alloc::format!("{} / {}", selected + 1, labels.len()),
+            1,
+            MUTED,
+        );
+    }
     c.rect(32, h - 64, w - 64, 1, GOLD);
     c.text(
         40,

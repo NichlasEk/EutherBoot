@@ -1,4 +1,6 @@
 #![no_std]
+extern crate alloc;
+pub mod config;
 
 /// Bounded selection: navigation never activates an entry.
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -17,12 +19,6 @@ impl Menu {
         }
     }
 }
-pub const ENTRIES: [&str; 3] = [
-    "Run EFI test application",
-    "Configuration (preview)",
-    "Return to firmware",
-];
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -1,9 +1,8 @@
-//! First chainloading slice: one explicit EFI application on our own volume.
+//! Chainload a validated EFI entry on our own volume.
 use core::mem::MaybeUninit;
 use uefi::{
-    Status,
+    CString16, Status,
     boot::{self, LoadImageSource, OpenProtocolParams},
-    cstr16,
     proto::{
         BootPolicy,
         device_path::{
@@ -24,7 +23,9 @@ pub enum LoadError {
 }
 
 /// No discovery, ambiguous volume selection, automatic retry or persistent writes.
-pub fn test_child() -> Result<(), LoadError> {
+pub fn chainload(entry: &boot_core::config::Entry) -> Result<(), LoadError> {
+    let filename = CString16::try_from(entry.path())
+        .map_err(|_| LoadError::Device(Status::INVALID_PARAMETER))?;
     let device = {
         let image = boot::open_protocol_exclusive::<LoadedImage>(boot::image_handle())
             .map_err(|e| LoadError::Device(e.status()))?;
@@ -40,7 +41,7 @@ pub fn test_child() -> Result<(), LoadError> {
         }
         builder
             .push(&FilePath {
-                path_name: cstr16!("\\EFI\\EutherBoot\\TestChild.efi"),
+                path_name: &filename,
             })
             .and_then(|b| b.finalize())
             .map_err(|_| LoadError::PathTooLong)?
