@@ -1,0 +1,15 @@
+[Unit]
+Description=Expose retained modules for the explicitly selected EutherBoot recovery kernel
+DefaultDependencies=no
+After=systemd-remount-fs.service
+Before=systemd-modules-load.service local-fs-pre.target sysinit.target shutdown.target
+Conflicts=shutdown.target
+ConditionKernelCommandLine=eutherboot.recovery
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/eutherboot/restore-modules
+RemainAfterExit=yes
+
+[Install]
+WantedBy=sysinit.target

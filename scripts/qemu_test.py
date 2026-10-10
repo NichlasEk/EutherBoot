@@ -12,7 +12,7 @@ VARS=Path(os.environ.get('OVMF_VARS','/usr/share/edk2/x64/OVMF_VARS.4m.fd'))
 class VM:
     def __init__(self,tmp,disk,out,iteration=1,width=1024,height=768,readonly=False,memory=256,cpu=None,
                  firmware_code=CODE,firmware_vars=VARS,secure=False,
-                 extra_disks=(),accel='tcg',serial_socket=None,user_network=False):
+                 extra_disks=(),accel='tcg',serial_socket=None,user_network=False,ready_marker="MENU_READY"):
         self.base=out/f'boot-{iteration}';self.base.mkdir(exist_ok=True)
         self.log=self.base/'debug.log';self.log.write_text('')
         vars_path=tmp/f'vars-{iteration}.fd';shutil.copy2(firmware_vars,vars_path)
@@ -39,7 +39,11 @@ class VM:
         self.proc=subprocess.Popen(args,stdout=self.err,stderr=self.err)
         self.sock=None;self.stream=None
         try:
-            self.wait('MENU_READY',timeout=60)
+            if ready_marker:self.wait(ready_marker,timeout=60)
+            deadline=time.monotonic()+60
+            while not qmp.exists():
+                if self.proc.poll() is not None or time.monotonic()>deadline:raise RuntimeError('QMP unavailable')
+                time.sleep(.05)
             self.sock=socket.socket(socket.AF_UNIX);self.sock.settimeout(10);self.sock.connect(str(qmp))
             self.stream=self.sock.makefile('rwb',buffering=0);json.loads(self.stream.readline());self.command('qmp_capabilities')
         except BaseException:

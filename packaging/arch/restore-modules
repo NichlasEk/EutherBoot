@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-only
+source /usr/local/lib/eutherboot/common.sh
+generation=
+for word in $(cat /proc/cmdline); do
+    case $word in eutherboot.recovery=*) [[ -z $generation ]] || fail 'duplicate recovery selector'; generation=${word#*=};; esac
+done
+[[ -n $generation ]] || exit 0
+check_generation "$generation"
+version=$(cat "$STATE/generations/$generation/version")
+valid_token "$version" && [[ $version == "$(uname -r)" ]] || fail 'recovery generation does not match the running kernel'
+source_modules="$STATE/generations/$generation/modules"
+target="/usr/lib/modules/$version"
+[[ ! -L $target ]] || fail 'module target is a symbolic link'
+mkdir -p "$target"
+# Bind the retained, verified tree; do not replace pacman-owned files.
+mount --bind "$source_modules" "$target"
+mount -o remount,bind,ro "$target"
+echo "EUTHERBOOT_RECOVERY_MODULES $version $generation"

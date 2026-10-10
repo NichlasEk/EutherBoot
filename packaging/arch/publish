@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-only
+source /usr/local/lib/eutherboot/common.sh
+case ${3:-} in
+    "$STATE/staging/linux.efi") package=linux ;;
+    "$STATE/staging/linux-lts.efi") package=linux-lts ;;
+    *) exit 0 ;;
+esac
+check_esp
+valid_token "${KERNELVERSION:-}" || fail 'missing kernel version from mkinitcpio'
+exec 9>/run/eutherboot-generation.lock; flock -n 9 || fail 'another generation operation is running'
+image=$3
+[[ -f $image && ! -L $image && $(bootctl kernel-identify "$image") == uki ]] || fail 'invalid generated UKI'
+directory="$ESP_MOUNT/EFI/EutherBoot/kernels"; mkdir -p "$directory"
+# Recovery is published first. A failed new build/publication never removes it.
+if [[ -f $STATE/pending/$package ]]; then
+    generation=$(cat "$STATE/pending/$package")
+    [[ -f $directory/recovery-$generation.efi ]] || make_recovery "$generation" "$package"
+fi
+sign_image "$image"
+publish_file "$image" "$directory/$package.efi"
+printf '%s\n' "$KERNELVERSION" > "$STATE/$package.version.new"
+mv "$STATE/$package.version.new" "$STATE/$package.version"
+rm -f "$STATE/pending/$package"
+sync -f "$STATE"
+echo "EUTHERBOOT_MANAGED_UKI $package ${KERNELVERSION:-unknown}"

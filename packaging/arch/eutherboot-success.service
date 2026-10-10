@@ -1,0 +1,12 @@
+[Unit]
+Description=Record the successfully started EutherBoot kernel generation
+After=local-fs.target systemd-user-sessions.service
+ConditionKernelCommandLine=eutherboot.managed=1
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/eutherboot/mark-good
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

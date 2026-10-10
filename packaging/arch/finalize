@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-only
+source /usr/local/lib/eutherboot/common.sh
+# Standard mkinitcpio hooks usually clear pending generations. A dependency-only
+# transaction may not rebuild them; finish those through the same normal preset.
+for package in linux linux-lts; do
+    [[ -f $STATE/pending/$package ]] || continue
+    mkinitcpio -p "$package"
+    [[ ! -f $STATE/pending/$package ]] || fail "$package publication is still pending; do not reboot until repaired"
+done

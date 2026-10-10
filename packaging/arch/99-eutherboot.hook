@@ -1,0 +1,16 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = linux
+Target = linux-lts
+Target = mkinitcpio
+Target = systemd
+Target = systemd-ukify
+Target = intel-ucode
+Target = amd-ucode
+
+[Action]
+Description = Checking EutherBoot boot generation publication...
+When = PostTransaction
+Exec = /usr/local/lib/eutherboot/finalize

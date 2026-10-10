@@ -1,0 +1,16 @@
+name: Rust and EFI
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup target add x86_64-unknown-uefi
+      - run: cargo test --locked -p boot-core
+      - run: cargo run --locked -p config-check -- eutherboot.toml
+      - run: cargo build --locked --release -p eutherboot --target x86_64-unknown-uefi
+      - run: python3 -m unittest discover -s tests/installer -v
+      - run: python3 -m py_compile tools/eutherbootctl.py scripts/guest_console.py scripts/arch-release-qemu.py
+      - run: for script in packaging/arch/common.sh packaging/arch/prepare packaging/arch/publish packaging/arch/restore-modules packaging/arch/mark-good packaging/arch/finalize; do bash -n "$script"; done

@@ -19,6 +19,25 @@ EFI authentication and a signed diagnostic UKI. The official installed Arch basi
 image also boots through EutherBoot with its own initramfs, systemd and Btrfs root;
 two cold boots verify a persistent guest write. Physical hardware remains untested.
 
+## Installation tooling
+
+A plan-first side-by-side installer and managed Arch `linux`/`linux-lts` integration
+are available in `tools/eutherbootctl.py` and `packaging/arch/`. The integration
+retains matching kernel modules, publishes UKIs at stable paths, supports optional
+owner-key signing, and provides removal with preset restoration. See the
+[installation and rollback guide](docs/INSTALLATION.md) for scope and restrictions.
+Physical deployment is not part of the automatic test environment.
+
+```sh
+bash scripts/package-release.sh  # non-instrumented EFI and installation tools
+python3 scripts/arch-release-qemu.py  # disposable installed-Arch recovery matrix
+```
+
+The larger Arch matrix requires the prepared official image, a release config
+validator (`cargo build --release -p config-check`), the normal EFI test artifacts,
+Secure Boot test tools and guest package downloads. Evidence is written under
+`artifacts/arch-release/`; only a completed `result.json` establishes a passing run.
+
 ## Build and run
 
 Requirements: Rust with `x86_64-unknown-uefi`, Python 3.11+, QEMU x86_64 and OVMF.
@@ -179,8 +198,9 @@ refusal paths, replacement of an existing UKI, and reboot after a simulated powe
 cut with an abandoned partial staging file. Evidence is written under
 `artifacts/arch-update-qemu/`.
 
-This is a QEMU prototype, not a host installer. LTS recovery, retained old modules,
-Secure Boot signing and comprehensive power-loss handling remain open. See the
+This older fixture tests the minimal update hook. The managed installer and
+expanded recovery matrix are described above. Arbitrary physical power-loss
+handling remains unverified. See the
 [guest-only update workflow and limits](tests/arch/update/README.md).
 
 ## Linux EFI-stub and UKI
@@ -323,7 +343,8 @@ is the Linux integrity boundary tested here.
 - In the test child: Enter returns SUCCESS; Escape returns ABORTED; D exits with error data.
 
 The menu's configuration summary is read-only and switches to text mode. The
-editor is opened with F3. No firmware-variable preferences or installer exist.
+editor is opened with F3. Firmware-variable preferences are not implemented.
+The separate Linux installer is described below.
 
 ## Discover EFI applications
 

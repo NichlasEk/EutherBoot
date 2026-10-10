@@ -20,8 +20,9 @@ a separate virtual ESP with persistent root writes across two cold boots. Next:
 broader kernel/stub compatibility and initrd memory/failure limits.
 The optional Arch update fixture now exercises a guest pacman upgrade, automatic
 UKI publication and boot into the updated kernel, plus selected refusal and
-interruption cases. This is not yet a host installer or a complete recovery design;
-LTS integration and retained old kernel/module generations remain open.
+interruption cases. The separate managed installer now includes LTS, retained kernel/module
+generations, optional signing, binary upgrades and removal. Its expanded
+installation/recovery matrix is tracked separately in validation evidence.
 Secure Boot acceptance/rejection is demonstrated with disposable owner keys in
 OVMF, including a signed diagnostic UKI; production/hardware trust remains open.
 Richer editor styling and Unicode remain refinements.

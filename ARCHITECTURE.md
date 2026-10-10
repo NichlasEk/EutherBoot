@@ -424,3 +424,36 @@ boot. This establishes that the selected boot file survives that interruption;
 it does not prove arbitrary interruption safety during filesystem metadata writes.
 All disks and firmware variables are disposable files; only the upgrade boot has
 QEMU user-mode NAT. No host sharing or forwarded services are configured.
+
+## Managed installation and recovery generations
+
+The newer `packaging/arch/` integration is deliberately separate from the minimal
+update fixture. `tools/eutherbootctl.py` validates a supplied mount/PARTUUID and
+prints a plan before any mutation. Explicit apply journals each root-file change,
+stages its own EFI directory and leaves existing loaders and firmware variables
+alone. Removal verifies ownership and local edits, retains an archive, and
+restores saved mkinitcpio presets. EFI upgrades retain a previous executable and
+journal the pending hash. These are Linux tools, not hidden firmware side effects.
+
+Before package changes, a root-owned generation contains the original kernel,
+initramfs, module tree, command line and checksums. Its recovery UKI is published
+before pacman is permitted to continue. A boot-success service records the normal
+UKI hash; a later update can rotate the stable recovery entry only from a confirmed
+current image. Unconfirmed successive updates preserve the existing recovery.
+An early systemd service verifies the selected archive and bind-mounts matching
+modules read-only before normal module loading. Recovery boots refuse updates.
+This preserves kernel/module compatibility without claiming userspace rollback.
+
+The generation store shares the root filesystem. Publication requires an exact
+writable FAT ESP identity, spare capacity, valid UKI, copied-byte verification
+and flushes. Optional signing happens before publication; certificate enrollment
+is outside this tool's authority. No automatic generation deletion occurs. The
+explicit prune command refuses current, pending and configured recovery targets.
+
+`arch-release-qemu.py` tests side-by-side installation, current/LTS/old-kernel
+boots, owner-key Secure Boot, missing installed modules, a deliberately broken
+active UKI, repair, signed EFI upgrade and removal back to the original fallback.
+The original signed Arch image is checked unchanged. Test signing keys live only
+in disposable files. An independent serial oracle checks systemd, root identity,
+kernel version, failed units and a real module load. Release EFI is additionally
+booted without diagnostic instrumentation using its ordinary timeout.

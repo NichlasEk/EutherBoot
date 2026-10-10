@@ -350,8 +350,9 @@ VMs and these 8 protocol cases (**68 QEMU cases total**). Logs are
 
 No physical machine, production Secure Boot trust store, multiple physical disks
 or hot-plug behavior has been demonstrated. Installed-distribution coverage is
-currently limited to the pinned Arch basic image under ordinary OVMF. Linux tests
-use one kernel version, one systemd stub and a diagnostic initramfs. Multiple
+currently limited to the pinned Arch basic image and its upgraded normal/LTS
+kernels under OVMF, including disposable owner-key Secure Boot. Diagnostic Linux
+tests use a separate minimal initramfs and one systemd stub. Multiple
 initrds and arbitrary non-EFI kernel loading are absent. LoadFile2 does not
 authenticate external initrds or command lines. A pre-existing provider is rejected
 by policy, but the foreign-provider collision branch is not yet integration-tested.
@@ -360,7 +361,7 @@ removal refusal are not injected; partial registration and synthetic removal
 refusal are covered. An unrecoverable removal failure requires power-off. Multiple ESPs on a virtual GPT disk are covered.
 Editor preferences persist in TOML; NVRAM preferences are not implemented.
 The editor cannot create the first configuration or repair raw malformed TOML;
-a valid backup can be restored explicitly. FAT rename is not power-loss atomic. Input is polled; the timeout itself uses a
+a valid backup can be restored explicitly. FAT rename is not power-loss atomic. Input waits on firmware events with a polling fallback; the timeout uses a
 firmware timer. Timer creation/check failures and allocation exhaustion are
 handled but not fault-injected. Automatic GOP failure fallback is not injected;
 manual text fallback is tested. Only printable ASCII labels/paths are supported.
@@ -375,7 +376,7 @@ verification. Import with an invalid live config or pending transaction is block
 these import-specific refusal branches have not been separately fault-injected.
 See ARCHITECTURE.md for loader cleanup and self-copy limitations.
 
-Artifact SHA-256 for the validated build (PE timestamps change on relink).
+Historical pre-event-input artifact SHA-256 (PE timestamps change on relink).
 The final source relink differs only in COFF/debug-directory timestamp fields;
 `artifacts/loadfile2-relink-check.txt` records that comparison. The tested artifact
 is retained:
@@ -393,3 +394,27 @@ over automatic boot. Broken event firmware falls back to polling with a diagnost
 All 25 core tests and 48 ordinary OVMF cases passed after this change, including
 timeout firing/cancellation, return paths, editors and cross-volume discovery.
 The owner selected GPL-3.0-only; Cargo metadata and LICENSE now declare it.
+
+## Managed Arch installation and recovery
+
+The initial complete run of `scripts/arch-release-qemu.py` passed side-by-side
+installation, normal Linux 7.2.9-arch1-1, LTS, current-kernel package reinstall,
+recovery after an intentionally damaged active UKI and missing module directory,
+LTS-assisted repair, original Linux 7.2.7-arch1-1 recovery, and uninstall. The
+original fallback EFI child then started successfully and matched its initial
+hash; the pinned original Arch image also remained unchanged. All installed
+normal/LTS/recovery starts used Secure Boot with a disposable OVMF owner key.
+Each Linux oracle checked expected uname, systemd/root identity, multi-user.target,
+no failed services, and loading the real `dummy` module with matching vermagic.
+Evidence for that run is retained under `artifacts/arch-release-initial-pass/`.
+
+The original 7.2.7 archive is captured by the fixture before installing integration
+prerequisites; it proves old-kernel/module recovery, not that the installer existed
+before that bootstrap upgrade. Automatic pre-transaction capture is exercised by
+the later installed-kernel reinstall. The older update fixture independently
+proved an actual 7.2.7 to 7.2.9 pacman upgrade. No result implies userspace rollback.
+
+Generation-pruning tests exercise read-only plans, actual deletion in temporary
+files, and refusals for selected/pending/configured generations, wrong identities,
+symlinks and path escapes. They mock ESP identity and redirect the process lock;
+they do not claim physical storage or firmware coverage.

@@ -1,0 +1,17 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = linux
+Target = linux-lts
+Target = mkinitcpio
+Target = systemd
+Target = systemd-ukify
+Target = intel-ucode
+Target = amd-ucode
+
+[Action]
+Description = Preserving EutherBoot recovery kernels and modules...
+When = PreTransaction
+Exec = /usr/local/lib/eutherboot/prepare
+AbortOnFail
