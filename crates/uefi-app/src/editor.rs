@@ -100,8 +100,9 @@ fn show(draft: Option<&Draft>, selected: usize, editing: bool, message: &str) {
         }
         if let Some(e) = d.entries.get(selected) {
             uefi::println!(
-                "\nPath: {}\nPartition: {}",
+                "\nPath: {}\nType: {} | Partition: {}",
                 e.path,
+                e.kind,
                 if e.partition_guid.is_empty() {
                     "own volume"
                 } else {
@@ -114,15 +115,56 @@ fn show(draft: Option<&Draft>, selected: usize, editing: bool, message: &str) {
     }
     if editing {
         uefi::println!(
-            "\nD default | T timeout | G appearance | A add | R remove\nN name | P path | U partition | I import | V validate\nF5 preview | S save | Esc discard"
+            "\nD default | T timeout | G appearance | A add | R remove\nN name | P path | U partition | I import | V validate\nK type | C cmdline | J initrd | F6 details\nF5 preview | S save | Esc discard"
         );
     } else {
         uefi::println!(
-            "\nE edit | B restore backup | C keep current / clear pending save\nEsc returns to boot menu"
+            "\nE edit | B restore backup | C keep current / clear pending save\nF6 entry details | Esc returns to boot menu"
         );
     }
     uefi::println!("\n{}", clipped(message, 160));
     trace("EDITOR_READY");
+}
+fn details(e: &DraftEntry) {
+    let content = format!(
+        "Name: {}\nType: {}\nPartition: {}\nPath: {}\nCmdline: {}\nInitrd: {}",
+        e.name,
+        e.kind,
+        if e.partition_guid.is_empty() {
+            "own volume"
+        } else {
+            &e.partition_guid
+        },
+        e.path,
+        e.cmdline,
+        e.initrd
+    );
+    let mut lines = Vec::new();
+    for line in content.lines() {
+        for part in line.as_bytes().chunks(64) {
+            lines.push(core::str::from_utf8(part).unwrap_or("?"));
+        }
+    }
+    let mut page = 0;
+    loop {
+        clear();
+        uefi::println!("EUTHERBOOT / ENTRY DETAILS (read-only)\n");
+        for line in lines.iter().skip(page * 12).take(12) {
+            uefi::println!("{line}");
+        }
+        uefi::println!(
+            "\nPage {} / {}   Up/Down: page   Esc: back",
+            page + 1,
+            lines.len().div_ceil(12)
+        );
+        trace("EDITOR_DETAILS");
+        match key() {
+            Some(Key::Special(ScanCode::DOWN)) if (page + 1) * 12 < lines.len() => page += 1,
+            Some(Key::Special(ScanCode::UP)) if page > 0 => page -= 1,
+            None | Some(Key::Special(ScanCode::ESCAPE)) => return,
+            _ => {}
+        }
+    }
 }
 fn preview(d: &Draft) -> Result<(), String> {
     let document = d.document()?;
@@ -219,6 +261,11 @@ pub fn run_import(import: Option<crate::discovery::Selection>) -> bool {
                     if !d.entries.is_empty() {
                         selected = (selected + 1) % d.entries.len();
                     }
+                }
+            }
+            Key::Special(ScanCode::FUNCTION_6) => {
+                if let Some(e) = draft.as_ref().and_then(|d| d.entries.get(selected)) {
+                    details(e);
                 }
             }
             Key::Special(ScanCode::FUNCTION_5) if editing => {
@@ -335,6 +382,9 @@ pub fn run_import(import: Option<crate::discovery::Selection>) -> bool {
                                         name,
                                         path,
                                         partition_guid: String::new(),
+                                        kind: "efi".into(),
+                                        cmdline: String::new(),
+                                        initrd: String::new(),
                                     });
                                     selected = d.entries.len() - 1;
                                 }
@@ -366,6 +416,47 @@ pub fn run_import(import: Option<crate::discovery::Selection>) -> bool {
                         if let Some(e) = d.entries.get_mut(selected) {
                             if let Some(v) = prompt("path", &e.path, 240) {
                                 e.path = v;
+                            }
+                        }
+                    }
+                    'k' => {
+                        if let Some(e) = d.entries.get_mut(selected) {
+                            if e.kind == "efi" {
+                                e.kind = "linux-efi".into();
+                            } else if confirm(
+                                "Change Linux EFI entry to plain EFI?",
+                                "The draft's kernel command line and initrd path will be cleared.",
+                            ) {
+                                e.kind = "efi".into();
+                                e.cmdline.clear();
+                                e.initrd.clear();
+                            }
+                        }
+                    }
+                    'c' => {
+                        if let Some(e) = d.entries.get_mut(selected) {
+                            if e.kind == "linux-efi" {
+                                if let Some(v) =
+                                    prompt("cmdline", &e.cmdline, boot_core::linux::MAX_CMDLINE)
+                                {
+                                    e.cmdline = v;
+                                }
+                            } else {
+                                message =
+                                    "K selects linux-efi; plain EFI/UKI uses embedded resources."
+                                        .into();
+                            }
+                        }
+                    }
+                    'j' => {
+                        if let Some(e) = d.entries.get_mut(selected) {
+                            if e.kind == "linux-efi" {
+                                if let Some(v) = prompt("initrd (empty = none)", &e.initrd, 240) {
+                                    e.initrd = v;
+                                }
+                            } else {
+                                message =
+                                    "K selects linux-efi before editing an initrd path.".into();
                             }
                         }
                     }

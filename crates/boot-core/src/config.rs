@@ -16,14 +16,39 @@ pub struct Config {
     timeout: u16,
     theme: String,
 }
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EntryKind {
+    Efi,
+    LinuxEfi,
+}
+impl EntryKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Efi => "efi",
+            Self::LinuxEfi => "linux-efi",
+        }
+    }
+}
 #[derive(Debug, Clone)]
 pub struct Entry {
     id: String,
     name: String,
     path: String,
     partition_guid: Option<String>,
+    kind: EntryKind,
+    cmdline: Option<String>,
+    initrd: Option<String>,
 }
 impl Entry {
+    pub fn kind(&self) -> EntryKind {
+        self.kind
+    }
+    pub fn cmdline(&self) -> Option<&str> {
+        self.cmdline.as_deref()
+    }
+    pub fn initrd(&self) -> Option<&str> {
+        self.initrd.as_deref()
+    }
     pub fn id(&self) -> &str {
         &self.id
     }
@@ -78,6 +103,8 @@ struct RawEntry {
     kind: String,
     path: Option<String>,
     partition_guid: Option<String>,
+    cmdline: Option<String>,
+    initrd: Option<String>,
 }
 
 /// Canonical GPT unique-partition GUID syntax; not a filesystem UUID or type GUID.
@@ -95,11 +122,13 @@ pub fn valid_partition_guid(value: &str) -> bool {
 
 /// Deliberately restricted to unambiguous ASCII FAT paths in this milestone.
 pub fn valid_path(path: &str) -> bool {
+    valid_esp_path(path) && path.to_ascii_lowercase().ends_with(".efi")
+}
+pub fn valid_esp_path(path: &str) -> bool {
     path.is_ascii()
         && path.len() <= 240
-        && path.len() > 9
+        && path.len() > 5
         && path[..5.min(path.len())].eq_ignore_ascii_case("\\EFI\\")
-        && path.to_ascii_lowercase().ends_with(".efi")
         && path
             .bytes()
             .all(|b| b.is_ascii_graphic() && !b"/:*?\"<>|~".contains(&b))
@@ -165,9 +194,22 @@ pub fn parse(source: &str) -> Result<Config, String> {
         {
             return Err(fail("name must be 1..48 printable ASCII characters"));
         }
-        if e.kind != "efi" {
-            return Err(fail("unsupported type; only efi is implemented"));
-        }
+        let kind = match e.kind.as_str() {
+            "efi" => {
+                if e.cmdline.is_some() || e.initrd.is_some() {
+                    return Err(fail(
+                        "cmdline/initrd are only valid for linux-efi; UKIs use embedded resources",
+                    ));
+                }
+                EntryKind::Efi
+            }
+            "linux-efi" => {
+                crate::linux::load_options(e.cmdline.as_deref().unwrap_or(""), e.initrd.as_deref())
+                    .map_err(|s| fail(&s))?;
+                EntryKind::LinuxEfi
+            }
+            _ => return Err(fail("unsupported type; expected efi or linux-efi")),
+        };
         let path = e.path.ok_or_else(|| fail("efi entry requires path"))?;
         if !path.is_ascii() || !valid_path(&path) {
             return Err(fail(
@@ -197,6 +239,9 @@ pub fn parse(source: &str) -> Result<Config, String> {
             name: e.name,
             path,
             partition_guid,
+            kind,
+            cmdline: e.cmdline,
+            initrd: e.initrd,
         });
     }
     let default_index = entries
@@ -227,6 +272,22 @@ mod tests {
         )
         .unwrap();
         assert_eq!(c.timeout(), 0);
+    }
+    #[test]
+    fn linux_fields_are_explicit_and_efi_resources_cannot_be_overridden() {
+        let linux = format!(
+            "{}\ncmdline='console=ttyS0'\ninitrd='\\EFI\\Linux\\initrd.cpio'",
+            BASE.replace("type = \"efi\"", "type = 'linux-efi'")
+        );
+        let c = parse(&linux).unwrap();
+        assert_eq!(c.entries()[0].kind(), EntryKind::LinuxEfi);
+        assert_eq!(c.entries()[0].initrd(), Some("\\EFI\\Linux\\initrd.cpio"));
+        for extra in ["cmdline=''", "initrd='\\EFI\\x.img'", "cmdline=123"] {
+            assert!(parse(&format!("{BASE}\n{extra}")).is_err());
+        }
+        assert!(parse(&linux.replace("console=ttyS0", "initrd=bad")).is_err());
+        assert!(parse(&linux.replace("initrd.cpio", "../initrd.cpio")).is_err());
+        assert!(parse(&linux.replace("'\\EFI\\Linux\\initrd.cpio'", "''")).is_err());
     }
     #[test]
     fn typed_default_and_timeout() {

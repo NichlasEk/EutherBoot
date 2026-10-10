@@ -42,6 +42,7 @@ dependencies = [
  "boot-core",
  "font8x8",
  "uefi",
+ "uefi-raw",
 ]
 
 [[package]]

@@ -9,7 +9,7 @@ import sys
 import qemu_cases
 script = pathlib.Path(__file__).with_name('qemu.py')
 cases = [[], ['--width','640','--height','480'], ['--disk-image']]
-cases += [['--scenario',s] for s in ('abort','missing','invalid')]
+cases += [['--scenario',s] for s in ('abort','exit-data','missing','invalid')]
 cases += [['--config-case',s] for s in qemu_cases.CASES if s != 'sample']
 # Exercise scrolling at the smallest supported framebuffer resolution.
 cases += [['--config-case','many','--width','640','--height','480']]

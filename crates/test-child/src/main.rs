@@ -53,7 +53,7 @@ fn main() -> Status {
         let _ = out.clear();
     });
     uefi::println!(
-        "EUTHERBOOT EFI TEST CHILD\n\nIndependent executable reached through LoadImage / StartImage.\n\nENTER: return SUCCESS\nESC: return ABORTED\n\nNo disks or firmware variables are changed."
+        "EUTHERBOOT EFI TEST CHILD\n\nIndependent executable reached through LoadImage / StartImage.\n\nENTER: return SUCCESS\nESC: return ABORTED\nD: Exit with error data\n\nNo disks or firmware variables are changed."
     );
     trace("CHILD_READY");
     loop {
@@ -61,6 +61,23 @@ fn main() -> Status {
             Ok(Some(Key::Printable(c))) if char::from(c) == '\r' => {
                 trace("CHILD_RETURN_SUCCESS");
                 return Status::SUCCESS;
+            }
+            Ok(Some(Key::Printable(c))) if char::from(c) == 'd' => {
+                trace("CHILD_EXIT_DATA");
+                let mut data: [u16; 14] = [
+                    70, 105, 120, 116, 117, 114, 101, 32, 101, 114, 114, 111, 114, 0,
+                ];
+                // SAFETY: no live protocol borrows/resources. Firmware copies this
+                // valid UCS-2 buffer before returning to the parent via Exit().
+                let _ = unsafe {
+                    boot::exit(
+                        boot::image_handle(),
+                        Status::ABORTED,
+                        core::mem::size_of_val(&data),
+                        data.as_mut_ptr().cast(),
+                    )
+                };
+                return Status::ABORTED;
             }
             Ok(Some(Key::Special(ScanCode::ESCAPE))) => {
                 trace("CHILD_RETURN_ABORTED");

@@ -2,9 +2,8 @@
 use core::mem::MaybeUninit;
 use uefi::{
     CString16, Handle, Status,
-    boot::{self, LoadImageSource, OpenProtocolParams},
+    boot::{self, OpenProtocolParams},
     proto::{
-        BootPolicy,
         device_path::{
             DevicePath,
             build::{DevicePathBuilder, media::FilePath},
@@ -32,14 +31,25 @@ pub fn entry_device(entry: &boot_core::config::Entry) -> Result<Handle, LoadErro
 }
 pub fn chainload(entry: &boot_core::config::Entry) -> Result<(), LoadError> {
     let device = entry_device(entry)?;
-    if entry.partition_guid().is_some() {
+    if entry.partition_guid().is_some() || entry.kind() == boot_core::config::EntryKind::LinuxEfi {
         crate::images::verify(device, entry.path())
             .map_err(|s| LoadError::Target(alloc::format!("EFI target check: {s:?}")))?;
     }
-    chainload_path(device, entry.path())
+    let options = if entry.kind() == boot_core::config::EntryKind::LinuxEfi {
+        Some(
+            crate::linux::prepare(device, entry)
+                .map_err(|s| LoadError::Target(alloc::format!("Linux EFI setup: {s:?}")))?,
+        )
+    } else {
+        None
+    };
+    launch(device, entry.path(), options)
 }
 
 pub fn chainload_path(device: Handle, filename: &str) -> Result<(), LoadError> {
+    launch(device, filename, None)
+}
+fn launch(device: Handle, filename: &str, mut options: Option<CString16>) -> Result<(), LoadError> {
     let filename =
         CString16::try_from(filename).map_err(|_| LoadError::Device(Status::INVALID_PARAMETER))?;
     let mut buffer = [MaybeUninit::uninit(); 4096];
@@ -58,16 +68,27 @@ pub fn chainload_path(device: Handle, filename: &str) -> Result<(), LoadError> {
             .map_err(|_| LoadError::PathTooLong)?
     };
     // Protocol borrows are dropped before control can pass to the child.
-    let child = boot::load_image(
-        boot::image_handle(),
-        LoadImageSource::FromDevicePath {
-            device_path: path,
-            boot_policy: BootPolicy::ExactMatch,
-        },
-    )
-    .map_err(|e| LoadError::Load(e.status()))?;
+    let child = crate::image_services::load(path)?;
+    if let Some(options) = &options {
+        let mut image = match boot::open_protocol_exclusive::<LoadedImage>(child) {
+            Ok(image) => image,
+            Err(e) => {
+                boot::unload_image(child).map_err(|e| LoadError::Cleanup(e.status()))?;
+                return Err(LoadError::Device(e.status()));
+            }
+        };
+        // SAFETY: CString16 owns stable, NUL-terminated UCS-2 storage. It remains
+        // live until StartImage returns and the child is released/unloaded.
+        unsafe {
+            image.set_load_options(options.as_ptr().cast(), options.num_bytes() as u32);
+        }
+        crate::trace(&alloc::format!(
+            "LOAD_OPTIONS_SET bytes={}",
+            options.num_bytes()
+        ));
+    }
     crate::trace("CHAINLOAD_LOADED");
-    let result = boot::start_image(child).map_err(|e| LoadError::Start(e.status()));
+    let result = crate::image_services::start(child);
     // UEFI unloads applications on return/Exit. Do not blindly unload a stale
     // handle. A pre-entry refusal may leave the loaded image alive instead.
     match boot::test_protocol::<LoadedImage>(OpenProtocolParams {
@@ -76,14 +97,22 @@ pub fn chainload_path(device: Handle, filename: &str) -> Result<(), LoadError> {
         controller: None,
     }) {
         Ok(true) => {
-            boot::unload_image(child).map_err(|e| LoadError::Cleanup(e.status()))?;
+            if let Err(e) = boot::unload_image(child) {
+                // A live image may still retain the pointer. Leak only on failed cleanup,
+                // rather than freeing referenced storage. No callback/code is installed.
+                core::mem::forget(options.take());
+                return Err(LoadError::Cleanup(e.status()));
+            }
             crate::trace("CHAINLOAD_UNLOADED");
         }
         Ok(false) => crate::trace("CHAINLOAD_RELEASED"),
         Err(e) if e.status() == Status::INVALID_PARAMETER || e.status() == Status::UNSUPPORTED => {
             crate::trace("CHAINLOAD_RELEASED");
         }
-        Err(e) => return Err(LoadError::Cleanup(e.status())),
+        Err(e) => {
+            core::mem::forget(options.take());
+            return Err(LoadError::Cleanup(e.status()));
+        }
     }
     result
 }

@@ -10,19 +10,20 @@ CODE=Path(os.environ.get('OVMF_CODE','/usr/share/edk2/x64/OVMF_CODE.4m.fd'))
 VARS=Path(os.environ.get('OVMF_VARS','/usr/share/edk2/x64/OVMF_VARS.4m.fd'))
 
 class VM:
-    def __init__(self,tmp,disk,out,iteration=1,width=1024,height=768,readonly=False):
+    def __init__(self,tmp,disk,out,iteration=1,width=1024,height=768,readonly=False,memory=256,cpu=None):
         self.base=out/f'boot-{iteration}';self.base.mkdir(exist_ok=True)
         self.log=self.base/'debug.log';self.log.write_text('')
         vars_path=tmp/f'vars-{iteration}.fd';shutil.copy2(VARS,vars_path)
         qmp=tmp/f'qmp-{iteration}'
         self.err=(self.base/'qemu.log').open('w')
-        args=['qemu-system-x86_64','-machine','q35','-accel','tcg','-m','256','-net','none','-no-reboot','-display','none',
+        args=['qemu-system-x86_64','-machine','q35','-accel','tcg','-m',str(memory),'-net','none','-no-reboot','-display','none',
               '-vga','none','-device',f'VGA,xres={width},yres={height}',
               '-drive',f'if=pflash,format=raw,readonly=on,file={CODE}',
               '-drive',f'if=pflash,format=raw,file={vars_path}',
               '-drive',f'if=virtio,format=raw,file={disk},readonly={"on" if readonly else "off"}',
               '-debugcon',f'file:{self.log}','-global','isa-debugcon.iobase=0xe9',
               '-serial',f'file:{self.base}/serial.log','-qmp',f'unix:{qmp},server=on,wait=off']
+        if cpu:args += ['-cpu',cpu]
         self.proc=subprocess.Popen(args,stdout=self.err,stderr=self.err)
         self.sock=None;self.stream=None
         try:
@@ -44,11 +45,13 @@ class VM:
             if time.monotonic()>deadline:raise AssertionError(f'Missing {marker}: {self.log.read_text()[before:]}')
             time.sleep(.03)
     def key(self,key,marker=None,delay=.08):
-        before=len(self.log.read_text());self.command('human-monitor-command',{'command-line':f'sendkey {key} 30'})
+        before=len(self.log.read_text())
+        result=self.command('human-monitor-command',{'command-line':f'sendkey {key} 30'})
+        if result.strip():raise RuntimeError(f'QEMU sendkey {key}: {result}')
         if marker:self.wait(marker,before)
         time.sleep(delay)
     def text(self,text):
-        names={'\\':'backslash',' ': 'spc','.':'dot','-':'minus','_':'shift-minus',':':'shift-semicolon',"'":'apostrophe','/':'slash'}
+        names={'\\':'backslash',' ': 'spc','.':'dot','-':'minus','_':'shift-minus',':':'shift-semicolon',"'":'apostrophe','/':'slash','=':'equal',',':'comma','"':'shift-apostrophe'}
         for c in text:
             name=names.get(c,c.lower() if c.islower() or c.isdigit() else 'shift-'+c.lower())
             self.key(name,'PROMPT_CHANGED',.045)

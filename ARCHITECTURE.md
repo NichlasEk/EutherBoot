@@ -26,7 +26,7 @@ document. All file/protocol handles are dropped before child execution.
 The typed Config and Entry have private fields and are only constructed by the
 shared parser. Boot settings deny unknown fields; default is mandatory, timeout
 is optional/zero, theme optional/system-regis (text is also supported). Entries require id, name, type and
-path. Only EFI entries are implemented. IDs are unique; case-insensitive EFI paths
+path. EFI and explicit Linux EFI-stub entries are implemented. IDs are unique; case-insensitive EFI paths
 are unique within a partition selector. The optional nonzero partition_guid is
 normalized to lowercase; omission means the current volume. No arbitrary default
 or partially accepted list is produced.
@@ -77,8 +77,8 @@ best-effort; simultaneous loss of both GOP and text output is unresolved.
 `loader` builds a full device path from an explicit volume handle and file path
 (the application's own device for entries without partition_guid), in a bounded 4096-byte buffer. It calls LoadImage/ExactMatch
 and StartImage with no borrowed protocols or graphics buffers held across transfer.
-This is EFI chainloading, not arbitrary Linux-kernel loading. No command lines,
-initrds or ExitBootServices handoff are implemented.
+Ordinary EFI applications receive no external options. Explicit linux-efi entries
+use the preparation described below; this is not arbitrary Linux-kernel loading.
 
 Returning applications are unloaded by firmware. The loader checks whether the
 child still exposes LoadedImage before attempting explicit unload, avoiding an
@@ -87,23 +87,57 @@ cleanup attempt. Device, path, load, start/exit and cleanup errors are distingui
 After a returning attempt the menu is redrawn with its selection and text mode.
 No automatic fallback to a different target or retry is permitted.
 
-Dependency limitations found in uefi-rs 0.40.0 source: start_image does not expose
-or free nonempty ExitData; load_image does not return an optional loaded handle on
-SECURITY_VIOLATION. The test child returns without ExitData and tests use ordinary
-non-Secure-Boot OVMF. These paths require a maintained crate fix/update or a narrowly
-justified wrapper before general third-party/authentication-rejection support.
+uefi-rs 0.40.0 start_image does not expose/free nonempty ExitData, and load_image
+does not expose the optional loaded handle on SECURITY_VIOLATION. The narrow
+image_services adapters use the existing uefi-raw ABI types to free ExitData and
+unload a rejected image when firmware returns a handle. Three consecutive
+nonempty-ExitData returns are exercised, including text mode. Secure Boot rejection
+and its optional-handle cleanup branch are not yet exercised.
 Handle-release checks are not complete heap-leak audits. A child that hangs or
 exits boot services cannot be recovered by this menu.
 
+## Linux EFI-stub boundary
+
+`boot-core::linux` validates printable ASCII command lines and composes one explicit
+`initrd=` argument before user options (including a possible `--`). `uefi-app::linux`
+opens the selected ESP read-only, checks PE32+ x86_64 application plus Linux HdrS,
+boot signature and protocol >= 2.11, checks the kernel's command-line capacity,
+and preflights the initrd's type, size and readability. File/protocol borrows end
+before LoadImage/StartImage. This preflight is not cryptographic validation or a
+protection against concurrent replacement.
+
+The loader retains a stable CString16 until the child is released/unloaded. If
+cleanup fails or image lifetime cannot be established, it deliberately retains
+that allocation rather than freeing a pointer the live image may still use.
+No callback or installed protocol points into EutherBoot. The Linux stub owns
+initrd loading, memory-map acquisition and ExitBootServices. The initial path-based
+`initrd=` interface is documented but a modern LoadFile2 provider remains planned.
+Only one initrd is supported. A UKI is a self-contained ordinary EFI entry with
+no external options; its stub implements the Linux handoff.
+
+A generated static PID 1 independently reports Linux uname and /proc/cmdline,
+checks diagnostic arguments, then powers off. Tests use a fresh minimal initramfs,
+not the host distribution's initramfs or root filesystem. The observed systemd
+stub writes random-seed and boot-secret-mixin files when its virtual ESP is
+writable. Child side effects are outside EutherBoot's configuration transaction;
+there is no sandbox for EFI children. Writable-UKI tests account for those writes,
+and read-only-UKI tests demonstrate Linux can reach PID 1 without them.
+
+References: [Linux EFI stub](https://docs.kernel.org/admin-guide/efi-stub.html),
+[x86 PE/COFF entry point](https://docs.kernel.org/arch/x86/boot.html#pe-coff-entry-point),
+[UKI format](https://uapi-group.org/specifications/specs/unified_kernel_image/),
+[systemd random seed](https://github.com/systemd/systemd/blob/main/src/boot/random-seed.c)
+and [boot secret](https://github.com/systemd/systemd/blob/main/src/boot/boot-secret.c).
+No source from those implementations was copied.
+
 ## Subsequent modules
 
-- Broader image compatibility: Linux EFI-stub/UKI tests, command-line/initrd
-  handling and maintained-crate fixes for image lifecycle limitations.
+- Broader image compatibility: more kernels/stubs, a LoadFile2 initrd provider,
+  Secure Boot acceptance/rejection and cleanup fault injection.
 - Preferences: optional vendor-GUID variables with bounded versioned data, written
   only by an explicit user action. Unsupported persistence remains nonfatal.
-- Linux/UKI: separate command-line, initrd, memory-map and handoff logic, tested
-  independently from ordinary EFI chainloading. Secure Boot trust/signing and
-  rejection behavior are compatibility gates, not current claims.
+- Secure Boot trust/signing and rejection behavior remain separate gates;
+  unsigned Linux/UKI execution is not a compatibility claim for signed systems.
 
 ## Architectural references and licenses
 
@@ -141,7 +175,9 @@ any optional firmware entry must be individually recorded and removed on request
 
 F3 opens inspection without acquiring writable file handles. E creates a Draft
 independent of the active Config; field input is bounded ASCII and mutations stay
-in memory. Default, timeout and appearance are editable, as are entry names/paths.
+in memory. Default, timeout and appearance are editable, as are entry names/paths, kind,
+Linux command line and initrd. F6 provides paginated full-field inspection.
+Switching back to ordinary EFI requires confirmation before clearing Linux fields.
 Entries can be added and removed. A removed default remains unresolved until D
 explicitly picks a replacement. The current implementation requires an existing
 valid live config to enter edit mode; it is not a raw TOML repair editor.
@@ -241,8 +277,8 @@ Discovery tests use two ESPs and one non-ESP FAT partition on a temporary GPT di
 The independent child reports its actual LoadedImage device's partition GUID,
 proving which volume supplied identical paths. Read/write-enabled virtual disks
 are hashed in full before/after the session to check absence of writes, rather
-than merely relying on a read-only QEMU drive setting. Secure Boot, real operating
-systems and hardware remain separate gates.
+than merely relying on a read-only QEMU drive setting. Secure Boot, installed distributions
+and hardware remain separate gates.
 
 
 ## Persisted cross-volume targets

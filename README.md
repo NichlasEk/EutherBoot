@@ -13,7 +13,9 @@ confirmed saves with backup, and explicit recovery after interrupted saves.
 F4 discovers EFI applications on GPT EFI System Partitions for explicit manual
 launch or import into an unsaved configuration draft. Persisted targets can select
 an ESP by its unique partition GUID. A separate EFI child demonstrates returning success and failure.
-No installed operating system, physical hardware or Secure Boot has been tested.
+Linux EFI-stub and unsigned UKI boots reach a generated minimal initramfs PID 1 in
+QEMU, including a second ESP. No installed distribution, physical hardware or
+Secure Boot has been tested.
 
 ## Build and run
 
@@ -27,7 +29,7 @@ isolated rustup installation under `.tools/` without changing the host compiler.
 ./scripts/build.sh
 python3 scripts/qemu.py                 # interactive window
 ./scripts/validate-config.sh eutherboot.toml
-./scripts/test.sh                       # 21 Rust tests + 47 OVMF cases
+./scripts/test.sh                       # 24 Rust tests + 48 OVMF cases
 ```
 
 Override `OVMF_CODE` and `OVMF_VARS` if needed. Defaults are Arch Linux's
@@ -126,6 +128,59 @@ Unicode entry names, additional themes and `type = "firmware"` are **not impleme
 unsupported values produce errors. The built-in firmware-return action simply
 returns to the caller; it does not open firmware settings or change BootOrder.
 
+## Linux EFI-stub and UKI
+
+An x86_64 Linux kernel built with `CONFIG_EFI_STUB` can be copied under an `.efi`
+filename and selected explicitly:
+
+```toml
+[[entry]]
+id = "linux"
+name = "Linux EFI-stub"
+type = "linux-efi"
+path = '\EFI\Linux\kernel.efi'
+cmdline = "root=UUID=YOUR-ROOT-UUID ro"
+initrd = '\EFI\Linux\initrd.img'
+```
+
+These are illustrative paths and parameters, not detected host values. The optional
+`partition_guid` selects the ESP for both kernel and initrd. The command line is
+optional, at most 1024 printable ASCII bytes. The optional single initrd requires
+an absolute `\EFI\` path with the same path restrictions except the `.efi` suffix;
+it must be a readable, nonempty regular file no larger than 128 MiB. Explicit
+`initrd=` in cmdline is rejected; `noinitrd` is rejected when an initrd is selected.
+The composed options must fit the kernel header's command-line capacity.
+
+EutherBoot checks the PE application and Linux boot headers, then supplies UCS-2
+LoadOptions with the documented `initrd=` EFI-stub option. Linux loads the initrd
+and handles ExitBootServices. This is not support for arbitrary ELF kernels or
+GRUB's Linux loading protocol. A LoadFile2 initrd provider remains future work.
+
+A **UKI uses `type = "efi"`** and its embedded kernel, command line and initrd.
+Ordinary EFI entries reject external `cmdline`/`initrd` fields. Discovery imports
+always start as `efi`; K explicitly changes the type when appropriate.
+Firmware authentication remains authoritative; unsigned QEMU success does not
+establish Secure Boot compatibility.
+
+Run the additional nine Linux cases with a local EFI-stub kernel and systemd stub:
+
+```sh
+./scripts/test-linux.sh --kernel /path/to/vmlinuz
+# Optional: --stub /path/to/linuxx64.efi.stub
+```
+
+This requires GCC with static libc, binutils (`objcopy`), `file` and the GPT/FAT
+requirements above. It compiles a minimal diagnostic PID 1 and creates a fresh
+initramfs and unsigned UKI under ignored `artifacts/linux/`, recording source and
+artifact hashes. It does not use the host initramfs or invoke host initramfs tools.
+Logs and screenshots are under `artifacts/linux-<case>-<width>x<height>/`.
+
+An EFI child controls its own side effects. The tested systemd stub creates
+`loader/random-seed` and `loader/boot-secret-mixin` on a writable ESP. A separate
+case records those writes and verifies existing EFI files and the other partition
+remain unchanged; normal UKI cases use a read-only virtual disk. This is not an
+EutherBoot disk-write policy imposed on the child.
+
 ## Controls
 
 - Up/Down: select, with wrapping and automatic page changes.
@@ -134,7 +189,7 @@ returns to the caller; it does not open firmware settings or change BootOrder.
 - F3: open the configuration editor in read-only mode.
 - F4: scan GPT EFI System Partitions and browse discovered applications.
 - Escape: return to the firmware caller.
-- In the test child: Enter returns SUCCESS; Escape returns ABORTED.
+- In the test child: Enter returns SUCCESS; Escape returns ABORTED; D exits with error data.
 
 The menu's configuration summary is read-only and switches to text mode. The
 editor is opened with F3. No firmware-variable preferences or installer exist.
@@ -192,6 +247,9 @@ Press **E** to begin a separate draft. Up/Down selects the entry to edit.
 | R | Remove the selected entry after confirmation |
 | N / P | Change the selected entry's name / path |
 | U | Edit partition GUID; clear the field to select the own volume |
+| K | Switch EFI / Linux EFI-stub type; clearing Linux fields requires confirmation |
+| C / J | Edit Linux command line / initrd path |
+| F6 | Inspect complete entry details, including long command lines (also in read-only mode) |
 | I | Browse EFI targets and import one into the current draft |
 | V | Validate the draft with the shared parser and self-reference check |
 | F5 | Preview without booting or changing the live configuration |

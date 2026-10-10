@@ -9,6 +9,9 @@ pub struct DraftEntry {
     pub path: String,
     /// Empty selects EutherBoot's own volume. Nonempty remains unvalidated draft text.
     pub partition_guid: String,
+    pub kind: String,
+    pub cmdline: String,
+    pub initrd: String,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Draft {
@@ -28,6 +31,9 @@ impl From<&Config> for Draft {
                     name: e.name().into(),
                     path: e.path().into(),
                     partition_guid: e.partition_guid().unwrap_or("").into(),
+                    kind: e.kind().as_str().into(),
+                    cmdline: e.cmdline().unwrap_or("").into(),
+                    initrd: e.initrd().unwrap_or("").into(),
                 })
                 .collect(),
             default: c.entries()[c.default_index()].id().into(),
@@ -78,6 +84,9 @@ impl Draft {
             name: format!("{short} [{}]", &guid[..8]),
             path: path.into(),
             partition_guid: guid.to_ascii_lowercase(),
+            kind: "efi".into(),
+            cmdline: String::new(),
+            initrd: String::new(),
         });
         Ok(self.entries.len() - 1)
     }
@@ -94,11 +103,18 @@ impl Draft {
         );
         for e in &self.entries {
             s.push_str(&format!(
-                "\n[[entry]]\nid = {}\nname = {}\ntype = \"efi\"\npath = {}\n",
+                "\n[[entry]]\nid = {}\nname = {}\ntype = {}\npath = {}\n",
                 quote(&e.id),
                 quote(&e.name),
+                quote(&e.kind),
                 quote(&e.path)
             ));
+            if !e.cmdline.is_empty() {
+                s.push_str(&format!("cmdline = {}\n", quote(&e.cmdline)));
+            }
+            if !e.initrd.is_empty() {
+                s.push_str(&format!("initrd = {}\n", quote(&e.initrd)));
+            }
             if !e.partition_guid.is_empty() {
                 s.push_str(&format!("partition_guid = {}\n", quote(&e.partition_guid)));
             }
@@ -134,6 +150,9 @@ mod tests {
             name: "Other".into(),
             path: "\\EFI\\Other.efi".into(),
             partition_guid: String::new(),
+            kind: "efi".into(),
+            cmdline: String::new(),
+            initrd: String::new(),
         });
         d.entries.remove(0);
         assert!(d.document().is_err());
@@ -157,6 +176,17 @@ mod tests {
             None
         );
         d.entries[1].partition_guid = "bad".into();
+        assert!(d.document().is_err());
+    }
+    #[test]
+    fn linux_draft_preserves_kind_resources_and_quoted_cmdline() {
+        let mut d = Draft::from(&base());
+        d.entries[0].kind = "linux-efi".into();
+        d.entries[0].cmdline = "console=ttyS0 test=\"hello world\"".into();
+        d.entries[0].initrd = "\\EFI\\Linux\\initrd.cpio".into();
+        let c = config::parse(&d.document().unwrap()).unwrap();
+        assert_eq!(Draft::from(&c), d);
+        d.entries[0].kind = "efi".into();
         assert!(d.document().is_err());
     }
     #[test]

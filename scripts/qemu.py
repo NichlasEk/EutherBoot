@@ -8,7 +8,7 @@ p = argparse.ArgumentParser()
 p.add_argument('--test', action='store_true')
 p.add_argument('--disk-image', action='store_true', help='Use disposable GPT/FAT (automatic for interactive runs)')
 p.add_argument('--config-case', choices=qemu_cases.CASES, default='sample')
-p.add_argument('--scenario', choices=('return', 'abort', 'missing', 'invalid'), default='return')
+p.add_argument('--scenario', choices=('return', 'abort', 'exit-data', 'missing', 'invalid'), default='return')
 p.add_argument('--width', type=int, default=1024)
 p.add_argument('--height', type=int, default=768)
 a = p.parse_args()
@@ -25,7 +25,7 @@ with tempfile.TemporaryDirectory(prefix='eutherboot-') as tmp:
     esp = tmp/'esp'; (esp/'EFI/BOOT').mkdir(parents=True)
     shutil.copy2(ROOT/'artifacts/EutherBoot.efi', esp/'EFI/BOOT/BOOTX64.EFI')
     (esp/'EFI/EutherBoot').mkdir()
-    if a.scenario in ('return', 'abort'):
+    if a.scenario in ('return', 'abort', 'exit-data'):
         shutil.copy2(ROOT/'artifacts/TestChild.efi', esp/'EFI/EutherBoot/TestChild.efi')
     elif a.scenario == 'invalid':
         (esp/'EFI/EutherBoot/TestChild.efi').write_bytes(b'Not a PE/COFF EFI executable.\n')
@@ -95,13 +95,13 @@ with tempfile.TemporaryDirectory(prefix='eutherboot-') as tmp:
                     def chainload(attempt, text_mode=False):
                         before=len(log.read_text())
                         serial_before=(out/'serial.log').stat().st_size
-                        if a.scenario in ('return', 'abort'):
+                        if a.scenario in ('return', 'abort', 'exit-data'):
                             key('ret','CHILD_READY')
                             screen(f'child-{attempt}')
                             child_pixels=(out/f'child-{attempt}.ppm').read_bytes().split(b'\n',3)[3]
                             assert child_pixels.count(bytes((8,21,35))) < a.width*a.height//2
                             assert 'EUTHERBOOT EFI TEST CHILD' in (out/'serial.log').read_text()
-                            key('ret' if a.scenario == 'return' else 'esc', 'MENU_RESUMED')
+                            key('ret' if a.scenario == 'return' else 'd' if a.scenario == 'exit-data' else 'esc', 'MENU_RESUMED')
                         else:
                             key('ret','MENU_RESUMED')
                         fresh=log.read_text()[before:]
@@ -110,13 +110,15 @@ with tempfile.TemporaryDirectory(prefix='eutherboot-') as tmp:
                         if a.scenario == 'return':
                             assert 'CHILD_CONTEXT_OK' in fresh and 'CHILD_RETURN_SUCCESS' in fresh
                             assert 'CHAINLOAD_RETURN_SUCCESS' in fresh and 'CHAINLOAD_ERROR' not in fresh
+                        elif a.scenario == 'exit-data':
+                            assert 'CHILD_EXIT_DATA' in fresh and 'EXIT_DATA_FREED bytes=28' in fresh and 'Start(ABORTED)' in fresh
                         elif a.scenario == 'abort':
                             assert 'CHILD_RETURN_ABORTED' in fresh and 'Start(ABORTED)' in fresh
                         elif a.scenario == 'missing':
                             assert 'Load(NOT_FOUND)' in fresh, fresh
                         else:
                             assert 'Load(LOAD_ERROR)' in fresh or 'Load(UNSUPPORTED)' in fresh, fresh
-                        if a.scenario in ('return','abort'):
+                        if a.scenario in ('return','abort','exit-data'):
                             assert 'CHAINLOAD_RELEASED' in fresh or 'CHAINLOAD_UNLOADED' in fresh
                         else:
                             assert 'CHILD_STARTED' not in fresh and 'CHAINLOAD_LOADED' not in fresh

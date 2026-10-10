@@ -3,6 +3,7 @@ extern crate alloc;
 pub mod config;
 pub mod discovery;
 pub mod draft;
+pub mod linux;
 pub mod transaction;
 
 /// Bounded selection: navigation never activates an entry.

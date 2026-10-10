@@ -1,11 +1,12 @@
-# Validation · 2026-10-10 · Persisted GPT targets
+# Validation · 2026-10-10 · Linux EFI-stub and UKI
 
 Host: Rust 1.99.0, QEMU 11.1.2 TCG/q35, ordinary OVMF, x86_64 UEFI target.
-This is virtual-development evidence, not physical hardware or OS boot evidence.
+This is virtual-development evidence: Linux reaches a generated diagnostic PID 1.
+It is not evidence of an installed distribution or physical hardware boot.
 
 ## Shared parser and builds
 
-Twenty-one Rust tests cover menu wrap/empty state, the example and safe defaults,
+Twenty-four Rust tests cover menu wrap/empty state, the example and safe defaults,
 non-first defaults, positive timeouts, malformed TOML, unknown/duplicate fields,
 bad types/ranges/themes, duplicate IDs and case-insensitive paths, unsupported
 entry types, traversal/aliases, display controls/Unicode and resource bounds.
@@ -16,13 +17,14 @@ backup during interrupted recovery. Discovery tests reject unsafe names, truncat
 headers, drivers and wrong architectures. Selector tests cover canonical GUID
 syntax, zero/malformed/wrong-type rejection, case normalization and duplicate
 paths scoped to a selector. Draft import preserves default/timeout and roundtrips
-the selector, including clearing it back to omission. Both real PE32+ EFI executables build with
+the selector, including clearing it back to omission. Linux tests cover typed fields, strict option bounds/conflicts, managed initrd
+composition and draft roundtrips. Both real PE32+ EFI executables build with
 Cargo.lock, including the parser. The normal firmware also passes a build check
 without debug features.
 
 ## OVMF matrix
 
-`./scripts/test.sh` builds/tests and runs **47 independent QEMU cases**. Each has
+`./scripts/test.sh` builds/tests and runs **48 independent QEMU cases**. Each has
 its own disposable FAT filesystem and firmware-variable copy, with no attached
 host disks or networking. Editor tests use a real virtual GPT/FAT disk image. At most three VMs run concurrently. Test steps have
 deadlines; an outer timeout interrupts the runner/VM process group.
@@ -31,6 +33,7 @@ deadlines; an outer timeout interrupts the runner/VM process group.
 | --- | --- | --- |
 | Sample, successful child at 1024×768 and 640×480 | 2 | TOML-loaded EFI target starts and returns; menu restored |
 | Child ABORTED, missing child, invalid child | 3 | Error retained on menu, no unintended target or retry |
+| Nonempty child ExitData | 1 | Three explicit ABORTED returns free 28-byte ExitData and retain menu, including text mode |
 | Non-first configured default | 1 | Selection 1 loads a relocated child by its configured path |
 | 3s timeout | 1 | Default starts once after the delay; return never rearms it |
 | Any-key cancellation | 1 | Unhandled `x` cancels timeout; later explicit Enter works |
@@ -45,7 +48,7 @@ deadlines; an outer timeout interrupts the runner/VM process group.
 | Invalid editor draft | 1 | Self-reference and missing default rejected; explicit default repair validates |
 | Read-only disk | 1 | Save reports WRITE_PROTECTED; original unchanged |
 | Interrupted save at three checkpoints | 3 | Kill after staging, backup or install; next boot blocks automatic selection; explicit recovery succeeds |
-| Persisted GPT targets at both resolutions | 2 | Same path on two ESPs launches from the selected volume, proven by child-reported GUID; data partition and self-copies excluded |
+| Linux EFI-stub and UKI at both resolutions | 2 | Same path on two ESPs launches from the selected volume, proven by child-reported GUID; data partition and self-copies excluded |
 | Duplicate GPT GUIDs | 1 | All ambiguous ESPs excluded; no targets promoted |
 | Empty discovery | 1 | Only self/non-application files present; empty menu remains usable |
 | Discovery candidate limit | 1 | 64-target cap is visible as partial; pagination reaches last entry |
@@ -88,8 +91,8 @@ same image. These are controlled interruption tests, not proof against torn
 sectors or all physical power-loss behavior. No host boot configuration or
 firmware variables were modified by EutherBoot.
 
-The full 47-case suite is exercised by `./scripts/test.sh`; its combined run log
-is `artifacts/cross-volume-regression.log`. Discovery uses two ESPs and one non-ESP
+The full 48-case suite is exercised by `./scripts/test.sh`; its combined run log
+is `artifacts/efi-regression.log`. Discovery uses two ESPs and one non-ESP
 FAT partition on one generated GPT disk. Fixtures include identical paths,
 a renamed EutherBoot binary on the second ESP, invalid PE data, an AArch64 image,
 and an EFI driver. Only eligible targets appear. Enter/cancel does not load an
@@ -122,11 +125,53 @@ GUIDs distinguish remote success from accidental own-volume fallback. Imported
 drafts were visually inspected at 1024×768 and 640×480: full GUID, path, unchanged
 boot policy and editing/saving controls remain readable.
 
+## Linux matrix
+
+`./scripts/test-linux.sh --kernel /usr/lib/modules/7.2.9-arch1-1/vmlinuz`
+builds local fixtures and runs **9 additional QEMU cases**, at most two concurrently.
+Tested kernel: Linux 7.2.9-arch1-1, CONFIG_EFI_STUB=y; installed systemd stub 262-1.
+Each VM uses 768 MiB, TCG CPU max, a disposable two-ESP GPT disk and copied OVMF
+variables. No host initramfs/root filesystem or physical disk is attached.
+
+| Cases | Count | Verified outcome |
+| --- | --- | --- |
+| EFI-stub on own and selected remote ESP | 2 | Real kernel receives managed initrd path and command line, reaches diagnostic PID 1 and powers off |
+| UKI on own and selected remote ESP, read-only disk | 2 | Embedded kernel, command line and initrd reach diagnostic PID 1 without external options |
+| UKI on writable disk | 1 | PID 1 reached; systemd stub creates two 32-byte seed files; existing EFI files and other partition retain exact hashes |
+| Missing initrd, non-Linux EFI application as linux-efi | 2 | Rejected before LoadImage; menu retained; explicitly selected recovery child starts and returns |
+| Linux editor at 1024×768 and 640×480 | 2 | Full details shown, type change can be cancelled or confirmed, command line and initrd edited and saved with exact backup, real Linux boots before and after reboot with persisted options |
+
+The oracle is independent guest PID 1 output on the serial console: uname,
+/proc/cmdline, the expected mode and owner-controlled diagnostic argument, then
+poweroff. A LoadImage marker alone does not count as a Linux boot. Remote tests
+put invalid payloads at identical paths on the own ESP and require the selected
+remote kernel/UKI to reach PID 1 after timeout. Ordinary EFI/UKI entries have no
+LoadOptions set by EutherBoot.
+
+EFI-stub and negative cases compare the whole writable disk hash. Editor saves
+verify exact TOML, original backup and an unchanged disk on the second boot.
+Read-only UKI disks also retain their whole-disk hashes. The writable UKI exception
+is explicit: systemd-stub creates `loader/random-seed` and
+`loader/boot-secret-mixin`, each 32 bytes. The test retains file names/sizes only,
+compares every EFI file hash and verifies bytes after the own ESP are unchanged.
+It does not claim the child performs no firmware-variable writes; all variables
+are disposable VM copies.
+
+Fixtures, provenance and hashes: `artifacts/linux/manifest.json`.
+Combined log: `artifacts/linux-regression.log`; extended editor reruns:
+`artifacts/linux-editor-regression.log` and `artifacts/linux-editor-640-regression.log`.
+Per-case serial/debug logs,
+screenshots and results: `artifacts/linux-<case>-<width>x<height>/`.
+The initramfs contains only a generated static /init, console node and directories.
+The unsigned UKI embeds that archive and the copied local kernel; no host signing
+keys or distribution initramfs content is consumed.
+
 ## Limits
 
-No real OS, physical machine, Secure Boot rejection, nonempty child ExitData,
-initrd/kernel command line, multiple physical disks or hot-plug behavior has been
-demonstrated. Multiple ESPs on a virtual GPT disk are covered.
+No installed distribution, physical machine, Secure Boot acceptance/rejection,
+multiple physical disks or hot-plug behavior has been demonstrated. Linux tests
+use one kernel version, one systemd stub and a diagnostic initramfs. A LoadFile2
+initrd provider, multiple initrds and arbitrary non-EFI kernel loading are absent. Multiple ESPs on a virtual GPT disk are covered.
 Editor preferences persist in TOML; NVRAM preferences are not implemented.
 The editor cannot create the first configuration or repair raw malformed TOML;
 a valid backup can be restored explicitly. FAT rename is not power-loss atomic. Input is polled; the timeout itself uses a
@@ -147,6 +192,6 @@ See ARCHITECTURE.md for loader cleanup and self-copy limitations.
 Artifact SHA-256 for this build:
 
 ```text
-60ba30cde246967654490d01615e6c8bf3b729d2f6dc4c77532ca2032efdc5a6  artifacts/EutherBoot.efi
-788bc2acd5f2bf3e228885be1f91a29e84df53b5843546d7987c72918989c1f8  artifacts/TestChild.efi
+358d8c2b650f7b4825d9d18ff4d935af4e5c5b1a51342477e105c5f494052c4b  artifacts/EutherBoot.efi
+89f068ad22f0e8a303975866f6f95974552e140a34f6a7f94e7b82973cc310f4  artifacts/TestChild.efi
 ```
