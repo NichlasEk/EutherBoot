@@ -74,7 +74,8 @@ A first hardware probe could instead run EutherBoot from separately prepared tes
 media and chainload the established loader. That tests firmware/menu integration
 without requiring the managed UKI layout to fit the existing ESP. Preparing media
 or writing a host ESP is a separate explicit action with a concrete destination
-and rollback plan. It has not been performed or demonstrated here.
+and rollback plan. The first USB delivery is now written and readback-verified;
+physical boot remains untested. See `../HANDOFF.md` for the test and rollback steps.
 
 Before interpreting any hardware-probe failure, establish a cold-boot baseline
 through the unchanged GRUB path: the inventoried running and installed kernel
