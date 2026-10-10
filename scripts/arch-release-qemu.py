@@ -50,7 +50,7 @@ with tempfile.TemporaryDirectory(prefix='eutherboot-release-') as directory:
     payload=target/'EFI/TestPayload';payload.mkdir()
     shutil.copytree(ROOT/'packaging/arch',payload/'arch')
     shutil.copy2(ROOT/'tools/eutherbootctl.py',payload/'eutherbootctl.py')
-    shutil.copy2(ROOT/'target/release/config-check',payload/'config-check')
+    shutil.copy2(ROOT/'artifacts/release/config-check',payload/'config-check')
     shutil.copy2(ROOT/'artifacts/EutherBoot.efi',payload/'EutherBoot.efi')
     shutil.copy2(ROOT/'artifacts/release/EutherBoot.efi',payload/'Release.efi')
     shutil.copy2(ROOT/'tests/arch/release/setup.sh',payload/'setup.sh')

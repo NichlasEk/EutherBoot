@@ -33,8 +33,9 @@ bash scripts/package-release.sh  # non-instrumented EFI and installation tools
 python3 scripts/arch-release-qemu.py  # disposable installed-Arch recovery matrix
 ```
 
-The larger Arch matrix requires the prepared official image, a release config
-validator (`cargo build --release -p config-check`), the normal EFI test artifacts,
+See the [managed installation fixture](tests/arch/release/README.md).
+The larger Arch matrix requires the prepared official image, the release package
+(including its native validator), the normal EFI test artifacts,
 Secure Boot test tools and guest package downloads. Evidence is written under
 `artifacts/arch-release/`; only a completed `result.json` establishes a passing run.
 

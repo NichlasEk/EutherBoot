@@ -18,6 +18,8 @@ BootNext, boot entries or Secure Boot keys. It refuses an existing EutherBoot
 installation instead of overwriting it. `/EFI/BOOT/BOOTX64.EFI` is never replaced.
 
 Prepare and validate a TOML configuration with real paths on the intended ESP.
+The release package's `eutherboot.toml` is the managed Arch example: use it only
+with `--arch`, or replace its targets with your own EFI applications.
 An installation plan is read-only:
 
 ```sh

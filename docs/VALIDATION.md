@@ -418,3 +418,26 @@ Generation-pruning tests exercise read-only plans, actual deletion in temporary
 files, and refusals for selected/pending/configured generations, wrong identities,
 symlinks and path escapes. They mock ESP identity and redirect the process lock;
 they do not claim physical storage or firmware coverage.
+
+The expanded final run additionally passed a signed upgrade from the diagnostic
+manager to the non-instrumented release EFI, automatic timeout boot into LTS,
+and an empty debug-port trace. Wrong ESP identity, duplicate installation and
+removal with a locally modified integration file were refused. After restoring
+that test edit, removal succeeded and the original fallback child booted again.
+This run's complete evidence is `artifacts/arch-release/result.json` and its nine
+boot directories. Tested kernels were 7.2.9-arch1-1, 6.18.55-1-lts and retained
+7.2.7-arch1-1. The host boot configuration was not touched.
+
+The current event-driven EFI also passed all 68 ordinary/Linux/LoadFile2/Secure
+Boot cases; logs are `artifacts/release-{core,linux,initrd,secureboot}-tests.log`.
+Eight installer generation-policy tests passed. The packaged source archive was
+extracted to a separate directory and passed its 25 Rust tests and a real release
+UEFI build with `--offline --locked` using the bundled dependencies. GitHub's
+Rust/EFI workflow passed for commit `5fd4b47`.
+
+Validated EFI hashes (the release package manifest includes all distribution files):
+
+```text
+3b1d1026a7de035537df5da12e5fb83f6fcd931601bc816effe968b5332bc5eb  artifacts/EutherBoot.efi
+c674a24b4b5fc15793fd6775bd0a725599a4cbde753708b66e9c76cd18e6d823  artifacts/release/EutherBoot.efi
+```
