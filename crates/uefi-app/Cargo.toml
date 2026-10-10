@@ -1,0 +1,12 @@
+[package]
+name = "eutherboot"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+boot-core = { path = "../boot-core" }
+uefi = { version = "0.40", features = ["alloc", "global_allocator", "panic_handler"] }
+font8x8 = { version = "0.3", default-features = false, features = ["unicode"] }
+
+[features]
+qemu-debug = []

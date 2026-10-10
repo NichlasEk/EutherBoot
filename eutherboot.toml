@@ -1,0 +1,12 @@
+# Milestone D proposal: this file is not yet read by the EFI application.
+# No installed operating system or physical ESP is assumed.
+[boot]
+default = "firmware"
+timeout = 0
+# Zero means wait for an explicit selection.
+theme = "system-regis"
+
+[[entry]]
+id = "firmware"
+name = "UEFI Firmware Settings"
+type = "firmware"
