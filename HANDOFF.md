@@ -2,6 +2,34 @@
 
 Uppdaterad 2026-10-10. **USB levererad och återläst; fysisk uppstart ännu inte demonstrerad.**
 
+## Aktuell överlämning
+
+Användaren står inför USB-testet och har fått instruktionerna nedan. Inget
+fysiskt testresultat har rapporterats ännu. Nästa session ska börja med att samla
+utfallet, inte anta att uppstarten lyckades eller att USB behöver skrivas om.
+
+Snabbvägen för användaren: spara arbetet → tillfällig UEFI-bootmeny →
+**General UDisk** → **Existing boot loader** → vanlig GRUB → Arch.
+Vid problem: fotografera sista bilden, stäng av, ta ur USB och använd vanlig
+intern uppstart. Den mer kontrollerade testordningen med en vanlig GRUB-start
+som jämförelse finns längre ned.
+
+### Fyll i efter försöket
+
+| Kontrollpunkt | Utfall just nu |
+| --- | --- |
+| USB syns som UEFI-val i firmware | Ej rapporterat |
+| EutherBoot-titel och meny visas | Ej rapporterat |
+| Menyn är läsbar och tangentbordet svarar | Ej rapporterat |
+| Enter på Existing boot loader visar vanlig GRUB | Ej rapporterat |
+| Arch når inloggning/skrivbord | Ej rapporterat |
+| Körande kernel efter försöket (`uname -r`) | Ej rapporterat |
+| Feltext/foto och sista fungerande steg | Ej rapporterat |
+| Vanlig intern GRUB-start fungerar utan USB | Ej rapporterat |
+
+Förslag på första fråga efter återkomst: **”Kom du till EutherBoot, sedan GRUB
+och till sist Arch? Om inte, vad var den sista bild eller feltext du såg?”**
+
 ## Läs detta först efter omstart
 
 Arbeta i `/run/media/nichlas/Kingston1TB/EutherBoot`. Läs denna fil och
@@ -9,7 +37,7 @@ Arbeta i `/run/media/nichlas/Kingston1TB/EutherBoot`. Läs denna fil och
 något byggs om eller skrivs. Fråga efter vad användaren faktiskt såg under testet.
 En lyckad Linux-start ensam bevisar inte att vägen gick genom EutherBoot.
 
-Kod och USB-källarkiv bygger på commit `74da2c3`. Den efterföljande handoff-committen
+Kod och USB-källarkiv bygger på commit `74da2c3`. Efterföljande handoff-commits
 ändrar endast dokumentation. Användaren har godkänt återkommande commit/push.
 Licens: GPL-3.0-only.
 
