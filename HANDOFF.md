@@ -1,12 +1,32 @@
 # EutherBoot – handoff inför första fysiska USB-testet
 
-Uppdaterad 2026-10-10. **USB levererad och återläst; fysisk uppstart ännu inte demonstrerad.**
+Uppdaterad 2026-10-10. **Fysisk EutherBoot-meny demonstrerad; GRUB-start blockerad av partitionsidentifieringen.**
 
 ## Aktuell överlämning
 
-Användaren står inför USB-testet och har fått instruktionerna nedan. Inget
-fysiskt testresultat har rapporterats ännu. Nästa session ska börja med att samla
-utfallet, inte anta att uppstarten lyckades eller att USB behöver skrivas om.
+Första fysiska försöket har rapporterats med foto: System Regis-menyn visas,
+men valet av befintlig startladdare ger `Missing ESP GUID … Menu retained.`
+Linux-inventering bekräftar att konfigurerad PARTUUID och ESP-typ stämmer;
+UDisks rapporterar GPT-flaggor 0. GRUB via EutherBoot är inte demonstrerad.
+
+QEMU har reproducerat samma feltext när PartitionInfo-protokollet simuleras
+saknat på andra volymer. Tidigare behandlades firmware-status UNSUPPORTED som
+om volymen bevisligen inte var en ESP. Koden skiljer nu protokollbrist från
+verifierat olämpliga partitioner och rapporterar `Firmware lacks PartitionInfo`.
+Detta är en diagnostisk korrigering, ingen verifierad lösning på fysisk uppstart.
+Firmware som inte exponerar den interna disken alls är fortfarande en annan
+möjlig orsak. F4-resultat eller en ny fysisk diagnostikkörning behövs.
+USB är inte omskriven; dess tidigare verifierade innehåll gäller fortfarande.
+
+Lokal reproduktion före korrigeringen:
+`artifacts/physical-probe-missing-partition-info-before/`.
+Efter korrigeringen:
+`artifacts/cross-volume-missing-partition-info-1024x768/`.
+Testet använder en separat test-faults-binär och disponibla virtuella diskar.
+Verifiering: 25 kärntester, release-bygge utan testfunktioner och fem QEMU-fall
+(same-path-self, missing, duplicate, non-esp, missing-partition-info).
+Protokollbrist ger också `partial=true` i F4. Testerna jämför hela virtuella
+diskens SHA-256 före/efter och provar återgång samt ett fungerande lokalt mål.
 
 Snabbvägen för användaren: spara arbetet → tillfällig UEFI-bootmeny →
 **General UDisk** → **Existing boot loader** → vanlig GRUB → Arch.
@@ -19,15 +39,15 @@ som jämförelse finns längre ned.
 | Kontrollpunkt | Utfall just nu |
 | --- | --- |
 | USB syns som UEFI-val i firmware | Ej rapporterat |
-| EutherBoot-titel och meny visas | Ej rapporterat |
+| EutherBoot-titel och meny visas | Bekräftat på foto |
 | Menyn är läsbar och tangentbordet svarar | Ej rapporterat |
 | Enter på Existing boot loader visar vanlig GRUB | Ej rapporterat |
 | Arch når inloggning/skrivbord | Ej rapporterat |
 | Körande kernel efter försöket (`uname -r`) | Ej rapporterat |
-| Feltext/foto och sista fungerande steg | Ej rapporterat |
+| Feltext/foto och sista fungerande steg | Missing ESP GUID; menyn kvar |
 | Vanlig intern GRUB-start fungerar utan USB | Ej rapporterat |
 
-Förslag på första fråga efter återkomst: **”Kom du till EutherBoot, sedan GRUB
+Tidigare förslag på första fråga efter återkomst: **”Kom du till EutherBoot, sedan GRUB
 och till sist Arch? Om inte, vad var den sista bild eller feltext du såg?”**
 
 ## Läs detta först efter omstart

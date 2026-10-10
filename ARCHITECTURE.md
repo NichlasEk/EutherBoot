@@ -297,6 +297,11 @@ any-key rule. Discovery starts only on request or R rescan. Enumerate firmware
 SimpleFileSystem handles; consult PartitionInfo for GPT ESP type, nonzero unique
 partition GUID, and absence of the legacy-BIOS attribute. Do not infer ESP status
 from FAT alone, partition position, a filename, or the current boot source.
+Missing PartitionInfo is an unverifiable identity, not a verified non-ESP: resolve
+stops with an explicit firmware diagnostic, and discovery marks the scan incomplete.
+This also prevents selecting a known match while another unverified handle could
+have the same GUID. The `test-faults` build can simulate this using the read-only
+`volume-fault` marker (`missing-partition-info`) on the manager volume.
 Duplicate GUIDs exclude every matching handle, even if their paths differ.
 Volumes sort by full GUID; candidates sort by volume then case-insensitive path.
 Each candidate retains its specific volume index/handle and exact path. The same

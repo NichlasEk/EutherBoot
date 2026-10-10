@@ -41,6 +41,7 @@ impl UefiStore {
                 | transaction::MARKER
                 | "editor-fault"
                 | "initrd-fault"
+                | "volume-fault"
         ) {
             return Err("Unexpected configuration filename".into());
         }

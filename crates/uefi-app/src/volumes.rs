@@ -30,7 +30,15 @@ pub(crate) fn protocol<P: ProtocolPointer + ?Sized>(
     .map_err(|e| e.status())
 }
 pub(crate) fn identity(handle: Handle) -> Result<Guid, Status> {
-    let partition = protocol::<PartitionInfo>(handle)?;
+    // Absence of the protocol is not evidence that this is a non-ESP.
+    // Keep it distinct from the deliberate exclusions below.
+    let partition = partition_info(handle).map_err(|s| {
+        if s == Status::UNSUPPORTED {
+            Status::NOT_FOUND
+        } else {
+            s
+        }
+    })?;
     let entry = partition.gpt_partition_entry().ok_or(Status::UNSUPPORTED)?;
     let kind = entry.partition_type_guid;
     let attributes = entry.attributes;
@@ -71,8 +79,29 @@ pub fn resolve(guid: &str) -> Result<Handle, String> {
                 found = Some(handle);
             }
             Ok(_) | Err(Status::UNSUPPORTED) => {}
+            Err(Status::NOT_FOUND) => {
+                return Err("Firmware lacks PartitionInfo; cannot verify ESP identities".into());
+            }
             Err(s) => return Err(format!("Cannot verify all ESP identities: {s:?}")),
         }
     }
     found.ok_or_else(|| format!("Missing ESP GUID {guid}"))
+}
+
+// Test-only firmware compatibility injection. Production never reads the marker.
+fn partition_info(handle: Handle) -> Result<boot::ScopedProtocol<PartitionInfo>, Status> {
+    #[cfg(feature = "test-faults")]
+    {
+        use boot_core::transaction::Store;
+        if own_device().ok() != Some(handle)
+            && crate::storage::UefiStore::open()
+                .ok()
+                .and_then(|mut s| s.read("volume-fault").ok().flatten())
+                .as_deref()
+                == Some(b"missing-partition-info")
+        {
+            return Err(Status::UNSUPPORTED);
+        }
+    }
+    protocol::<PartitionInfo>(handle)
 }
