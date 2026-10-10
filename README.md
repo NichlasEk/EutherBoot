@@ -14,8 +14,9 @@ F4 discovers EFI applications on GPT EFI System Partitions for explicit manual
 launch or import into an unsaved configuration draft. Persisted targets can select
 an ESP by its unique partition GUID. A separate EFI child demonstrates returning success and failure.
 Linux EFI-stub and unsigned UKI boots reach a generated minimal initramfs PID 1 in
-QEMU, including a second ESP. No installed distribution, physical hardware or
-Secure Boot has been tested.
+QEMU, including a second ESP. Disposable owner-key Secure Boot tests also cover
+EFI authentication and a signed diagnostic UKI. No installed distribution or
+physical hardware has been tested.
 
 ## Build and run
 
@@ -159,8 +160,8 @@ GRUB's Linux loading protocol. A LoadFile2 initrd provider remains future work.
 A **UKI uses `type = "efi"`** and its embedded kernel, command line and initrd.
 Ordinary EFI entries reject external `cmdline`/`initrd` fields. Discovery imports
 always start as `efi`; K explicitly changes the type when appropriate.
-Firmware authentication remains authoritative; unsigned QEMU success does not
-establish Secure Boot compatibility.
+Firmware authentication remains authoritative. The virtual owner-key tests below
+cover one OVMF policy; they do not establish broad hardware or shim compatibility.
 
 Run the additional nine Linux cases with a local EFI-stub kernel and systemd stub:
 
@@ -180,6 +181,50 @@ An EFI child controls its own side effects. The tested systemd stub creates
 case records those writes and verifies existing EFI files and the other partition
 remain unchanged; normal UKI cases use a read-only virtual disk. This is not an
 EutherBoot disk-write policy imposed on the child.
+
+## Secure Boot tests
+
+The test harness signs EutherBoot and its child with fresh disposable RSA keys,
+enrolls test certificates in a **temporary OVMF variable-store copy**, and enables
+SMM and Secure Boot in QEMU. It does not enroll anything in the host firmware or
+use existing signing keys. Private keys and signed fixture copies are deleted
+with the temporary test directory; only logs, screenshots, hashes and public
+certificate fingerprints remain under ignored `artifacts/secureboot-*`.
+
+Additional tools: OpenSSL, `sbsign`/`sbverify` from sbsigntools and `virt-fw-vars`
+from virt-firmware. Tested versions: sbsigntools 0.9.5 and virt-firmware 26.9.
+Tools may be on PATH; the runner also recognizes isolated installs under
+`.tools/sbsigntools/usr/bin/` and `.tools/secureboot/bin/`. For example:
+
+```sh
+python3 -m venv .tools/secureboot
+.tools/secureboot/bin/pip install 'virt-firmware==26.9'
+./scripts/build.sh
+python3 scripts/test-secureboot.py
+# After building the diagnostic Linux fixtures:
+python3 scripts/test-secureboot.py --uki
+```
+
+`OVMF_SECURE_CODE` overrides the default
+`/usr/share/edk2/x64/OVMF_CODE.secboot.4m.fd`; `OVMF_VARS` must be a matching blank
+template. The script creates its own PK, KEK, db and dbx from test certificates.
+One disposable certificate fills PK/KEK/db roles for this isolated test; it is
+not a production key-management example. No Microsoft/shim trust is added.
+
+Two resolution cases exercise a trusted image, unsigned image, unknown signer,
+changed signed image and certificate present in both db and dbx. Each refusal
+is repeated, followed by successful trusted-child execution. An untrusted default
+also fails once without automatic fallback or rearming. The independent child
+reads `SecureBoot=1` and `SetupMode=0` through firmware runtime services.
+`--uki` adds a third VM that then boots a signed diagnostic UKI to Linux PID 1.
+Its virtual disk is read-only; other cases hash their whole writable virtual disk.
+
+This OVMF rejects unauthorized images with `ACCESS_DENIED` and no loaded handle.
+Cleanup of an optional handle returned with `SECURITY_VIOLATION` remains untested.
+The tests do not cover shim/MOK/SBAT, physical firmware, production trust stores,
+or authentication of external TOML, command lines and initrds. Signing EutherBoot
+alone does not authenticate those external inputs; a signed self-contained UKI
+is the Linux integrity boundary tested here.
 
 ## Controls
 

@@ -10,20 +10,22 @@ CODE=Path(os.environ.get('OVMF_CODE','/usr/share/edk2/x64/OVMF_CODE.4m.fd'))
 VARS=Path(os.environ.get('OVMF_VARS','/usr/share/edk2/x64/OVMF_VARS.4m.fd'))
 
 class VM:
-    def __init__(self,tmp,disk,out,iteration=1,width=1024,height=768,readonly=False,memory=256,cpu=None):
+    def __init__(self,tmp,disk,out,iteration=1,width=1024,height=768,readonly=False,memory=256,cpu=None,
+                 firmware_code=CODE,firmware_vars=VARS,secure=False):
         self.base=out/f'boot-{iteration}';self.base.mkdir(exist_ok=True)
         self.log=self.base/'debug.log';self.log.write_text('')
-        vars_path=tmp/f'vars-{iteration}.fd';shutil.copy2(VARS,vars_path)
+        vars_path=tmp/f'vars-{iteration}.fd';shutil.copy2(firmware_vars,vars_path)
         qmp=tmp/f'qmp-{iteration}'
         self.err=(self.base/'qemu.log').open('w')
-        args=['qemu-system-x86_64','-machine','q35','-accel','tcg','-m',str(memory),'-net','none','-no-reboot','-display','none',
+        args=['qemu-system-x86_64','-machine','q35,smm=on' if secure else 'q35','-accel','tcg','-m',str(memory),'-net','none','-no-reboot','-display','none',
               '-vga','none','-device',f'VGA,xres={width},yres={height}',
-              '-drive',f'if=pflash,format=raw,readonly=on,file={CODE}',
+              '-drive',f'if=pflash,format=raw,readonly=on,file={firmware_code}',
               '-drive',f'if=pflash,format=raw,file={vars_path}',
               '-drive',f'if=virtio,format=raw,file={disk},readonly={"on" if readonly else "off"}',
               '-debugcon',f'file:{self.log}','-global','isa-debugcon.iobase=0xe9',
               '-serial',f'file:{self.base}/serial.log','-qmp',f'unix:{qmp},server=on,wait=off']
         if cpu:args += ['-cpu',cpu]
+        if secure:args += ['-global','driver=cfi.pflash01,property=secure,value=on']
         self.proc=subprocess.Popen(args,stdout=self.err,stderr=self.err)
         self.sock=None;self.stream=None
         try:

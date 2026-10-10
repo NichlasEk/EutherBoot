@@ -91,8 +91,8 @@ uefi-rs 0.40.0 start_image does not expose/free nonempty ExitData, and load_imag
 does not expose the optional loaded handle on SECURITY_VIOLATION. The narrow
 image_services adapters use the existing uefi-raw ABI types to free ExitData and
 unload a rejected image when firmware returns a handle. Three consecutive
-nonempty-ExitData returns are exercised, including text mode. Secure Boot rejection
-and its optional-handle cleanup branch are not yet exercised.
+nonempty-ExitData returns are exercised, including text mode. Secure Boot
+rejection is exercised under OVMF: ACCESS_DENIED returns no loaded handle. The optional-handle SECURITY_VIOLATION cleanup branch remains untested.
 Handle-release checks are not complete heap-leak audits. A child that hangs or
 exits boot services cannot be recovered by this menu.
 
@@ -133,11 +133,40 @@ No source from those implementations was copied.
 ## Subsequent modules
 
 - Broader image compatibility: more kernels/stubs, a LoadFile2 initrd provider,
-  Secure Boot acceptance/rejection and cleanup fault injection.
+  broader Secure Boot policies and cleanup fault injection.
 - Preferences: optional vendor-GUID variables with bounded versioned data, written
   only by an explicit user action. Unsupported persistence remains nonfatal.
-- Secure Boot trust/signing and rejection behavior remain separate gates;
-  unsigned Linux/UKI execution is not a compatibility claim for signed systems.
+- Secure Boot: virtual owner-key acceptance/rejection is demonstrated; shim/MOK,
+  production trust, hardware and optional rejected-handle cleanup remain gates.
+
+## Virtual Secure Boot boundary
+
+The harness uses existing sbsigntools for Authenticode and virt-firmware to enroll
+fresh test certificates into copied OVMF vars, with a Secure Boot-capable firmware
+image, q35 SMM and secure pflash. It never calls host efivarfs or enrolls host keys.
+A temporary directory contains all private keys and signed binaries. Their public
+fingerprints, input/payload hashes and test outcomes are the retained provenance.
+
+EutherBoot delegates image authentication to firmware LoadImage. It does not
+implement its own signature verifier, override rejections, or enroll trust during
+boot. The independent EFI child reads SecureBoot and SetupMode, so a successful
+signature-tool check or a Secure Boot-capable firmware filename alone cannot
+satisfy the integration oracle. Unsigned, unknown-signer, authenticated-byte
+mutation and dbx-revoked-certificate cases fail before StartImage. The signed child
+still executes after refusals, including text mode and nonempty ExitData returns.
+The revoked certificate is deliberately also enrolled in db to exercise dbx
+precedence. OVMF's observed refusal is ACCESS_DENIED with no image handle, a valid
+[LoadImage policy result](https://uefi.org/specs/UEFI/2.11/07_Services_Boot_Services.html#efi-boot-services-loadimage).
+
+An optional signed UKI proves one Linux kernel/stub can reach diagnostic PID 1
+under this owner-key policy. The UKI disk is read-only to separate execution from
+systemd-stub seed writes. This is not a claim that unsigned TOML or separate
+initrd/command-line inputs become authenticated by signing the boot manager.
+External EFI-stub resources, shim/MOK/SBAT, measured boot/TPM, production key
+rotation, revocation updates and physical firmware remain outside these tests.
+Test keys are not distribution credentials. Tool references:
+[sbsigntools](https://git.kernel.org/pub/scm/linux/kernel/git/jejb/sbsigntools.git/)
+and [virt-firmware](https://gitlab.com/kraxel/virt-firmware).
 
 ## Architectural references and licenses
 
@@ -277,8 +306,8 @@ Discovery tests use two ESPs and one non-ESP FAT partition on a temporary GPT di
 The independent child reports its actual LoadedImage device's partition GUID,
 proving which volume supplied identical paths. Read/write-enabled virtual disks
 are hashed in full before/after the session to check absence of writes, rather
-than merely relying on a read-only QEMU drive setting. Secure Boot, installed distributions
-and hardware remain separate gates.
+than merely relying on a read-only QEMU drive setting. Broader Secure Boot policies,
+installed distributions and hardware remain separate gates.
 
 
 ## Persisted cross-volume targets

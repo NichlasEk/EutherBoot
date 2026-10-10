@@ -1,7 +1,8 @@
-# Validation · 2026-10-10 · Linux EFI-stub and UKI
+# Validation · 2026-10-10 · Virtual Secure Boot
 
 Host: Rust 1.99.0, QEMU 11.1.2 TCG/q35, ordinary OVMF, x86_64 UEFI target.
-This is virtual-development evidence: Linux reaches a generated diagnostic PID 1.
+This is virtual-development evidence: Linux reaches a generated diagnostic PID 1,
+including a locally signed UKI under an enforced OVMF owner-key policy.
 It is not evidence of an installed distribution or physical hardware boot.
 
 ## Shared parser and builds
@@ -166,9 +167,58 @@ The initramfs contains only a generated static /init, console node and directori
 The unsigned UKI embeds that archive and the copied local kernel; no host signing
 keys or distribution initramfs content is consumed.
 
+## Secure Boot matrix
+
+`python3 scripts/test-secureboot.py --uki` runs three additional isolated VMs:
+1024×768, 640×480, and 1024×768 followed by a signed diagnostic Linux UKI.
+The first two disks are writable; the UKI disk is read-only. The entire disk hash
+is unchanged in all three. Each VM uses Secure Boot OVMF, q35 SMM, secure pflash,
+a fresh copied/enrolled variable store and independently generated RSA test keys.
+The host firmware, key databases and source EFI files are unchanged.
+
+Tools: sbsigntools 0.9.5 and virt-firmware 26.9. The sbsigntools Arch package was
+extracted into ignored `.tools/`, and its detached package signature verified with
+the distribution keyring. virt-firmware runs in a project-local Python venv.
+Tools are used as separate executables; no signing/firmware parsing code was copied.
+
+Every VM demonstrates:
+
+- An unsigned configured default attempts once at timeout, is refused and does
+  not restart or automatically select another target.
+- A trusted signed child starts and independently reads `SecureBoot=1` and
+  `SetupMode=0` using firmware runtime services.
+- Unsigned, unknown-key, tampered-signature and dbx-revoked-certificate children
+  each fail three manual attempts before StartImage. The revoked certificate is
+  present in both db and dbx; tampering changes an authenticated DOS-stub byte.
+- A trusted child starts after each category of refusal, then exits with 28 bytes
+  of ExitData that EutherBoot frees. Later refusals and returns exercise text mode.
+- Exactly 13 refusals and 5 trusted-child launches occur. This OVMF returns
+  `ACCESS_DENIED` with no rejected handle in all 39 refusals across the matrix.
+  `SECURITY_VIOLATION` with an optional loaded handle remains unexercised.
+
+The third VM additionally starts the signed UKI and independently reaches Linux
+7.2.9-arch1-1 diagnostic PID 1 with the embedded command line/initramfs, then powers
+off. Linux EFI-stub with an external unsigned initrd is not a Secure Boot integrity
+claim. No shim/MOK/SBAT, TPM, installed distribution or physical firmware is tested.
+
+Evidence: `artifacts/secureboot-matrix.log`, plus per-case
+`artifacts/secureboot-<width>x<height>[-uki]/result.json` and `boot-1/` logs/captures.
+Results record source/payload hashes, public certificate fingerprints, refusal
+counts and whole-disk hashes. Private keys, signed copies and firmware variable
+stores remain temporary and are removed after each test. The 640×480 graphical
+refusal and text-mode refusal were visually checked for legible diagnostics and
+usable navigation.
+
+Current-build regression checks: 24 Rust tests, config validation, EFI builds,
+format checking, no-debug firmware check, normal-OVMF ExitData return and read-only
+editor failure all pass. Logs: `artifacts/secureboot-build.log` and
+`artifacts/secureboot-normal-regression.log`. The broader 48-case normal OVMF and
+9-case unsigned Linux matrices above were last fully exercised at commit
+`2f500fe`; this change adds diagnostic tracing and Secure Boot fixture coverage.
+
 ## Limits
 
-No installed distribution, physical machine, Secure Boot acceptance/rejection,
+No installed distribution, physical machine, production Secure Boot trust store,
 multiple physical disks or hot-plug behavior has been demonstrated. Linux tests
 use one kernel version, one systemd stub and a diagnostic initramfs. A LoadFile2
 initrd provider, multiple initrds and arbitrary non-EFI kernel loading are absent. Multiple ESPs on a virtual GPT disk are covered.
@@ -192,6 +242,6 @@ See ARCHITECTURE.md for loader cleanup and self-copy limitations.
 Artifact SHA-256 for this build:
 
 ```text
-358d8c2b650f7b4825d9d18ff4d935af4e5c5b1a51342477e105c5f494052c4b  artifacts/EutherBoot.efi
-89f068ad22f0e8a303975866f6f95974552e140a34f6a7f94e7b82973cc310f4  artifacts/TestChild.efi
+28137a1247ef2b4510afe65b4741beebe1570565e6b1fcbaba4cec91f739054f  artifacts/EutherBoot.efi
+0072e7421bcd7370ccc6e8b2725bc4dcfe8518bb4c4f95f6d9b696087b82106d  artifacts/TestChild.efi
 ```

@@ -27,6 +27,20 @@ fn main() -> Status {
         return Status::ABORTED;
     }
     trace("CHILD_STARTED");
+    // Independent read-only evidence of the firmware's actual enforcement mode.
+    for name in [uefi::cstr16!("SecureBoot"), uefi::cstr16!("SetupMode")] {
+        let mut byte = [0u8; 1];
+        match uefi::runtime::get_variable(
+            name,
+            &uefi::runtime::VariableVendor::GLOBAL_VARIABLE,
+            &mut byte,
+        ) {
+            Ok((data, _)) if data.len() == 1 => {
+                trace(&alloc::format!("CHILD_FIRMWARE {name}={}", data[0]));
+            }
+            _ => trace(&alloc::format!("CHILD_FIRMWARE {name}=unknown")),
+        }
+    }
     let context_ok = boot::open_protocol_exclusive::<LoadedImage>(boot::image_handle())
         .map(|image| image.device().is_some() && image.file_path().is_some())
         .unwrap_or(false);

@@ -27,6 +27,7 @@ pub fn load(path: &DevicePath) -> Result<Handle, LoadError> {
         if let Some(child) = child {
             crate::trace(&alloc::format!("LOAD_REJECTED_HANDLE {status:?}"));
             boot::unload_image(child).map_err(|e| LoadError::Cleanup(e.status()))?;
+            crate::trace("LOAD_REJECTED_UNLOADED");
         }
         return Err(LoadError::Load(status));
     }
