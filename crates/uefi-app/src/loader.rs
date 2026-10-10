@@ -1,0 +1,90 @@
+//! First chainloading slice: one explicit EFI application on our own volume.
+use core::mem::MaybeUninit;
+use uefi::{
+    Status,
+    boot::{self, LoadImageSource, OpenProtocolParams},
+    cstr16,
+    proto::{
+        BootPolicy,
+        device_path::{
+            DevicePath,
+            build::{DevicePathBuilder, media::FilePath},
+        },
+        loaded_image::LoadedImage,
+    },
+};
+
+#[derive(Debug)]
+pub enum LoadError {
+    Device(Status),
+    PathTooLong,
+    Load(Status),
+    Start(Status),
+    Cleanup(Status),
+}
+
+/// No discovery, ambiguous volume selection, automatic retry or persistent writes.
+pub fn test_child() -> Result<(), LoadError> {
+    let device = {
+        let image = boot::open_protocol_exclusive::<LoadedImage>(boot::image_handle())
+            .map_err(|e| LoadError::Device(e.status()))?;
+        image.device().ok_or(LoadError::Device(Status::NOT_FOUND))?
+    };
+    let mut buffer = [MaybeUninit::uninit(); 4096];
+    let path = {
+        let volume = boot::open_protocol_exclusive::<DevicePath>(device)
+            .map_err(|e| LoadError::Device(e.status()))?;
+        let mut builder = DevicePathBuilder::with_buf(&mut buffer);
+        for node in volume.node_iter() {
+            builder = builder.push(&node).map_err(|_| LoadError::PathTooLong)?;
+        }
+        builder
+            .push(&FilePath {
+                path_name: cstr16!("\\EFI\\EutherBoot\\TestChild.efi"),
+            })
+            .and_then(|b| b.finalize())
+            .map_err(|_| LoadError::PathTooLong)?
+    };
+    // Protocol borrows are dropped before control can pass to the child.
+    let child = boot::load_image(
+        boot::image_handle(),
+        LoadImageSource::FromDevicePath {
+            device_path: path,
+            boot_policy: BootPolicy::ExactMatch,
+        },
+    )
+    .map_err(|e| LoadError::Load(e.status()))?;
+    crate::trace("CHAINLOAD_LOADED");
+    let result = boot::start_image(child).map_err(|e| LoadError::Start(e.status()));
+    // UEFI unloads applications on return/Exit. Do not blindly unload a stale
+    // handle. A pre-entry refusal may leave the loaded image alive instead.
+    match boot::test_protocol::<LoadedImage>(OpenProtocolParams {
+        handle: child,
+        agent: boot::image_handle(),
+        controller: None,
+    }) {
+        Ok(true) => {
+            boot::unload_image(child).map_err(|e| LoadError::Cleanup(e.status()))?;
+            crate::trace("CHAINLOAD_UNLOADED");
+        }
+        Ok(false) => crate::trace("CHAINLOAD_RELEASED"),
+        Err(e) if e.status() == Status::INVALID_PARAMETER || e.status() == Status::UNSUPPORTED => {
+            crate::trace("CHAINLOAD_RELEASED");
+        }
+        Err(e) => return Err(LoadError::Cleanup(e.status())),
+    }
+    result
+}
+
+impl LoadError {
+    pub fn notice(&self) -> alloc::string::String {
+        let (stage, status) = match self {
+            Self::Device(s) => ("Device", *s),
+            Self::PathTooLong => ("Device path", Status::BAD_BUFFER_SIZE),
+            Self::Load(s) => ("LoadImage", *s),
+            Self::Start(s) => ("StartImage / child exit", *s),
+            Self::Cleanup(s) => ("Cleanup", *s),
+        };
+        alloc::format!("{stage}: {status:?}. Menu retained.")
+    }
+}

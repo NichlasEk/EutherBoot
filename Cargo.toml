@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/boot-core", "crates/uefi-app"]
+members = ["crates/boot-core", "crates/uefi-app", "crates/test-child"]
 resolver = "2"
 
 [profile.release]

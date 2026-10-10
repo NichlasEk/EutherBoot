@@ -18,7 +18,7 @@ impl Menu {
     }
 }
 pub const ENTRIES: [&str; 3] = [
-    "Boot targets (not configured)",
+    "Run EFI test application",
     "Configuration (preview)",
     "Return to firmware",
 ];

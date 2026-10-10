@@ -2,6 +2,7 @@
 #![no_main]
 extern crate alloc;
 mod graphics;
+mod loader;
 use boot_core::{ENTRIES, Menu};
 use uefi::{
     boot,
@@ -75,12 +76,30 @@ fn main() -> Status {
                     trace("EXIT_FIRMWARE");
                     return Status::SUCCESS;
                 }
-                let notice = if menu.selected == 0 {
-                    "Discovery and chainloading arrive in milestone C."
+                if menu.selected == 0 {
+                    trace("CHAINLOAD_REQUEST");
+                    // Free the previous frame and all protocol borrows before
+                    // StartImage; no graphical state is retained across a child.
+                    let notice = match loader::test_child() {
+                        Ok(()) => {
+                            trace("CHAINLOAD_RETURN_SUCCESS");
+                            alloc::string::String::from("EFI application returned successfully.")
+                        }
+                        Err(error) => {
+                            let notice = error.notice();
+                            trace(&alloc::format!("CHAINLOAD_ERROR {error:?}"));
+                            notice
+                        }
+                    };
+                    text = render(&menu, &notice, text);
+                    trace("MENU_RESUMED");
                 } else {
-                    "Read-only preview. Editor arrives in milestone E."
-                };
-                text = render(&menu, notice, text);
+                    text = render(
+                        &menu,
+                        "Read-only preview. Editor arrives in milestone E.",
+                        text,
+                    );
+                }
                 continue;
             }
             Ok(Some(_)) => continue,

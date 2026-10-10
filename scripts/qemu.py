@@ -4,19 +4,25 @@ import argparse, json, os, pathlib, shutil, socket, subprocess, tempfile, time
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 p = argparse.ArgumentParser()
 p.add_argument('--test', action='store_true')
+p.add_argument('--scenario', choices=('return', 'abort', 'missing', 'invalid'), default='return')
 p.add_argument('--width', type=int, default=1024)
 p.add_argument('--height', type=int, default=768)
 a = p.parse_args()
 code = pathlib.Path(os.environ.get('OVMF_CODE', '/usr/share/edk2/x64/OVMF_CODE.4m.fd'))
 variables = pathlib.Path(os.environ.get('OVMF_VARS', '/usr/share/edk2/x64/OVMF_VARS.4m.fd'))
-for path in (code, variables, ROOT/'artifacts/EutherBoot.efi'):
+for path in (code, variables, ROOT/'artifacts/EutherBoot.efi', ROOT/'artifacts/TestChild.efi'):
     if not path.is_file(): p.error(f'Missing {path}; build first or set OVMF_CODE / OVMF_VARS')
-out = ROOT/'artifacts'/f'qemu-{a.width}x{a.height}'
+out = ROOT/'artifacts'/f'qemu-{a.width}x{a.height}-{a.scenario}'
 out.mkdir(parents=True, exist_ok=True)
 with tempfile.TemporaryDirectory(prefix='eutherboot-') as tmp:
     tmp = pathlib.Path(tmp)
     esp = tmp/'esp'; (esp/'EFI/BOOT').mkdir(parents=True)
     shutil.copy2(ROOT/'artifacts/EutherBoot.efi', esp/'EFI/BOOT/BOOTX64.EFI')
+    (esp/'EFI/EutherBoot').mkdir()
+    if a.scenario in ('return', 'abort'):
+        shutil.copy2(ROOT/'artifacts/TestChild.efi', esp/'EFI/EutherBoot/TestChild.efi')
+    elif a.scenario == 'invalid':
+        (esp/'EFI/EutherBoot/TestChild.efi').write_bytes(b'Not a PE/COFF EFI executable.\n')
     shutil.copy2(variables, tmp/'vars.fd')
     log = out/'debug.log'; log.write_text('')
     args = ['qemu-system-x86_64', '-machine', 'q35', '-accel', 'tcg', '-m', '256',
@@ -38,7 +44,7 @@ with tempfile.TemporaryDirectory(prefix='eutherboot-') as tmp:
                     if proc.poll() is not None: raise RuntimeError((out/'qemu.log').read_text())
                     if time.monotonic()>deadline: raise TimeoutError('UEFI menu did not start')
                     time.sleep(.1)
-                sock = socket.socket(socket.AF_UNIX); sock.connect(str(tmp/'qmp'))
+                sock = socket.socket(socket.AF_UNIX); sock.settimeout(10); sock.connect(str(tmp/'qmp'))
                 stream = sock.makefile('rwb', buffering=0)
                 json.loads(stream.readline())
                 def command(name, arguments=None):
@@ -49,13 +55,16 @@ with tempfile.TemporaryDirectory(prefix='eutherboot-') as tmp:
                         if 'return' in reply: return reply['return']
                 command('qmp_capabilities')
                 def screen(name): command('screendump', {'filename': str(out/f'{name}.ppm')})
+                def wait_marker(marker, before):
+                    deadline=time.monotonic()+10
+                    while marker not in log.read_text()[before:]:
+                        if proc.poll() is not None: raise RuntimeError('QEMU exited during test')
+                        if time.monotonic()>deadline: raise AssertionError(f'missing {marker}: {log.read_text()[before:]}')
+                        time.sleep(.05)
                 def key(name, marker):
                     before=len(log.read_text())
                     command('human-monitor-command', {'command-line':f'sendkey {name}'})
-                    deadline=time.monotonic()+5
-                    while marker not in log.read_text()[before:]:
-                        if time.monotonic()>deadline: raise AssertionError(f'{name}: missing {marker}')
-                        time.sleep(.05)
+                    wait_marker(marker, before)
                     time.sleep(.2)
                 screen('first-light')
                 with (out/'first-light.ppm').open('rb') as ppm:
@@ -67,17 +76,59 @@ with tempfile.TemporaryDirectory(prefix='eutherboot-') as tmp:
                 assert pixels.count(bytes((8,21,35))) > a.width*a.height//2, 'Missing navy canvas'
                 assert pixels.count(bytes((184,161,105))) > 500, 'Missing emblem/borders'
                 assert pixels.count(bytes((218,225,229))) > 100, 'Missing title/menu text'
+                assert 'CHILD_STARTED' not in log.read_text(), 'Unexpected automatic boot'
                 key('up','SELECT 2'); key('down','SELECT 0')
-                key('ret','ACTIVATE')
-                assert 'EXIT_FIRMWARE' not in log.read_text()
+                def chainload(attempt, text_mode=False):
+                    before=len(log.read_text())
+                    serial_before=(out/'serial.log').stat().st_size
+                    if a.scenario in ('return', 'abort'):
+                        key('ret','CHILD_READY')
+                        screen(f'child-{attempt}')
+                        child_pixels=(out/f'child-{attempt}.ppm').read_bytes().split(b'\n',3)[3]
+                        assert child_pixels.count(bytes((8,21,35))) < a.width*a.height//2
+                        assert 'EUTHERBOOT EFI TEST CHILD' in (out/'serial.log').read_text()
+                        key('ret' if a.scenario == 'return' else 'esc', 'MENU_RESUMED')
+                    else:
+                        key('ret','MENU_RESUMED')
+                    fresh=log.read_text()[before:]
+                    assert fresh.count('CHAINLOAD_REQUEST') == 1
+                    assert 'EXIT_FIRMWARE' not in fresh
+                    if a.scenario == 'return':
+                        assert 'CHILD_CONTEXT_OK' in fresh and 'CHILD_RETURN_SUCCESS' in fresh
+                        assert 'CHAINLOAD_RETURN_SUCCESS' in fresh and 'CHAINLOAD_ERROR' not in fresh
+                    elif a.scenario == 'abort':
+                        assert 'CHILD_RETURN_ABORTED' in fresh and 'Start(ABORTED)' in fresh
+                    elif a.scenario == 'missing':
+                        assert 'Load(NOT_FOUND)' in fresh, fresh
+                    else:
+                        assert 'Load(LOAD_ERROR)' in fresh or 'Load(UNSUPPORTED)' in fresh, fresh
+                    if a.scenario in ('return','abort'):
+                        assert 'CHAINLOAD_RELEASED' in fresh or 'CHAINLOAD_UNLOADED' in fresh
+                    else:
+                        assert 'CHILD_STARTED' not in fresh and 'CHAINLOAD_LOADED' not in fresh
+                    screen(f'resumed-{attempt}')
+                    resumed=(out/f'resumed-{attempt}.ppm').read_bytes().split(b'\n',3)[3]
+                    if text_mode:
+                        serial=(out/'serial.log').read_bytes()[serial_before:]
+                        assert b'EUTHERBOOT | SYSTEM REGIS' in serial, 'Missing restored text menu'
+                        assert b'Run EFI test application' in serial
+                        assert 'TEXT_READY' in fresh
+                        assert resumed.count(bytes((8,21,35))) < a.width*a.height//2
+                    else:
+                        # Child clears the display: verify the actual menu is redrawn,
+                        # not just that a trace says it resumed. Notice/footer may differ.
+                        assert resumed[:(a.height-110)*a.width*3] == pixels[:(a.height-110)*a.width*3]
+                chainload(1)
                 key('down','SELECT 1'); key('ret','ACTIVATE'); screen('preview')
+                key('up','SELECT 0'); chainload(2)
                 key('f2','TEXT_READY'); screen('text-fallback')
                 fallback=(out/'text-fallback.ppm').read_bytes().split(b'\n',3)[3]
                 assert fallback.count(bytes((8,21,35))) < a.width*a.height//2, 'Graphical canvas remained after F2'
-                assert 'EUTHERBOOT | SYSTEM REGIS' in (out/'serial.log').read_text(), 'Missing text console output'
+                chainload(3, text_mode=True)
+                key('down','SELECT 1')
                 key('down','SELECT 2'); key('ret','EXIT_FIRMWARE')
                 command('quit'); proc.wait(timeout=5)
-                print(f'PASS: first light, wrap, selection, preview, text fallback, firmware return ({a.width}x{a.height})')
+                print(f'PASS: {a.scenario}, three attempts, child/error evidence, menu recovery, graphical/text input ({a.width}x{a.height})')
         finally:
             if proc.poll() is None:
                 proc.terminate()

@@ -31,9 +31,9 @@ unresolved. No attempt is made to call ExitBootServices in this prototype.
   Missing/invalid configuration cancels automatic boot and opens diagnostics.
   Initial paths resolve only against the application's own volume; future
   explicit volume selectors must reject ambiguity rather than pick a disk.
-- EFI loader: LoadImage/StartImage with explicit device paths; retain the menu
-  when loading fails or a child returns, and release child resources. Never
-  fall through to another OS without an explicit, visible user policy.
+- EFI loader extension: replace the fixed test path with validated typed targets,
+  preserving the current explicit LoadImage/StartImage boundary and menu recovery.
+  Never fall through to another OS without an explicit, visible user policy.
 - Linux: separate EFI-stub/UKI handling from generic EFI chainloading.
   Kernel command lines, initrd delivery, memory-map lifetime and handoff require
   dedicated tests. Arbitrary kernel images are not assumed to be EFI images.
@@ -94,3 +94,32 @@ GOP is borrowed with GET_PROTOCOL rather than Exclusive: exclusive access can
 disconnect the firmware graphics-console driver and destroy visible fallback.
 The unsafe borrow is scoped to rendering, with no driver removal, console use
 or boot-services exit while it is alive.
+
+## Implemented first chainload
+
+`uefi-app::loader` builds a full device path from EutherBoot's LoadedImage device
+and the fixed `\EFI\EutherBoot\TestChild.efi` path, in a bounded 4096-byte buffer.
+An explicit Enter calls LoadImage with ExactMatch, then StartImage. No discovered
+or host-specific paths, EFI drivers, kernel formats or command lines are supported.
+All borrowed protocols and graphics buffers are released before transferring
+control. The independently linked `test-child` executable clears the console,
+checks that firmware supplied device/file context, and waits for Enter (SUCCESS)
+or Escape (ABORTED). It neither writes storage nor exits boot services.
+
+Returning UEFI applications are unloaded by firmware. The loader checks whether
+the child still exposes LoadedImage before any explicit unload, avoiding an
+unconditional double unload. This also provides a cleanup path if StartImage
+refuses a still-loaded image before entry. Status messages distinguish device,
+path construction, LoadImage, StartImage/child exit, and cleanup errors. The menu
+is redrawn after every returning attempt, with the current selection/text mode.
+No timeout, hidden alternative target or automatic retry is introduced.
+
+Dependency limitations identified by source inspection (uefi-rs 0.40.0):
+`start_image` does not expose/free nonempty ExitData, and `load_image` does not
+return the optional loaded handle on SECURITY_VIOLATION. Our fixture returns
+without ExitData and tests use non-Secure-Boot OVMF. These paths must be audited
+and addressed through a maintained crate update or a narrowly justified wrapper
+before arbitrary third-party payloads/authentication rejection are supported.
+The successful cleanup marker checks handle availability, not a complete heap
+leak audit. A child that hangs or exits boot services cannot be recovered by this
+menu; QEMU's external test deadline terminates a stuck VM.
