@@ -1,9 +1,12 @@
 #![no_std]
 #![no_main]
 extern crate alloc;
+mod compiler_support;
 mod config;
+mod editor;
 mod graphics;
 mod loader;
+mod storage;
 mod timeout;
 use alloc::{format, string::String, vec::Vec};
 use boot_core::Menu;
@@ -39,7 +42,7 @@ fn render(labels: &[&str], menu: &Menu, notice: &str, text: bool) -> bool {
         uefi::println!("{} {}", if i == menu.selected { ">" } else { " " }, entry);
     }
     uefi::println!(
-        "\n{}/{}\n{}\nUp/Down: select  Enter: open  F2: text  Esc: return",
+        "\n{}/{}\n{}\nUp/Down: select  Enter: open  F2: text  F3: editor  Esc: return",
         menu.selected + 1,
         labels.len(),
         notice
@@ -57,6 +60,15 @@ fn main() -> Status {
         let _ = out.enable_cursor(false);
         let _ = out.clear();
     });
+    let mut first = true;
+    loop {
+        if let Some(status) = session(first) {
+            return status;
+        }
+        first = false;
+    }
+}
+fn session(allow_timeout: bool) -> Option<Status> {
     let (config, diagnostic) = match config::load() {
         Ok(c) => {
             trace(&format!(
@@ -81,16 +93,21 @@ fn main() -> Status {
     };
     let seconds = config.as_ref().map(|c| c.timeout()).unwrap_or(0);
     let mut notice = diagnostic.clone().unwrap_or_else(|| {
-        if seconds == 0 {
+        if seconds == 0 || !allow_timeout {
             String::from("No automatic boot. Select an entry and press Enter.")
         } else {
             format!("Auto-start after {seconds}s. Any key cancels.")
         }
     });
-    let mut text = render(&labels, &menu, &notice, diagnostic.is_some());
+    let mut text = render(
+        &labels,
+        &menu,
+        &notice,
+        diagnostic.is_some() || config.as_ref().is_some_and(|c| c.theme() == "text"),
+    );
     // Start the deadline only after the menu is visible. Never arm it again
     // following a key, configuration error, load error, or returning child.
-    let mut timer = if seconds > 0 {
+    let mut timer = if allow_timeout && seconds > 0 {
         match timeout::AutoBoot::new(seconds) {
             Ok(t) => {
                 trace("TIMEOUT_ARMED");
@@ -111,7 +128,7 @@ fn main() -> Status {
             Ok(k) => k,
             Err(_) => {
                 trace("INPUT_ERROR");
-                return Status::DEVICE_ERROR;
+                return Some(Status::DEVICE_ERROR);
             }
         };
         let mut activate = false;
@@ -134,7 +151,14 @@ fn main() -> Status {
                 }
                 Key::Special(ScanCode::ESCAPE) => {
                     trace("EXIT_FIRMWARE");
-                    return Status::SUCCESS;
+                    return Some(Status::SUCCESS);
+                }
+                Key::Special(ScanCode::FUNCTION_3) => {
+                    if editor::run() {
+                        return None;
+                    }
+                    notice = "Editor closed. Configuration unchanged.".into();
+                    redraw = true;
                 }
                 Key::Special(ScanCode::FUNCTION_2) => {
                     text = true;
@@ -163,7 +187,7 @@ fn main() -> Status {
             trace("ACTIVATE");
             if menu.selected == labels.len() - 1 {
                 trace("EXIT_FIRMWARE");
-                return Status::SUCCESS;
+                return Some(Status::SUCCESS);
             }
             if let Some(entry) = entries.get(menu.selected) {
                 trace(&format!(
@@ -191,7 +215,7 @@ fn main() -> Status {
                     )
                 } else {
                     format!(
-                        "Source: \\EFI\\EutherBoot\\eutherboot.toml\n{} entries. Default: {}. Timeout: {}s.\nRead-only inspection; no changes are saved.",
+                        "Source: \\EFI\\EutherBoot\\eutherboot.toml\n{} entries. Default: {}. Timeout: {}s.\nRead-only inspection; F3 opens the editor.",
                         entries.len(),
                         entries[config.as_ref().unwrap().default_index()].id(),
                         seconds

@@ -2,4 +2,5 @@
 set -euo pipefail
 source "$(dirname "$0")/env.sh"
 bash scripts/build.sh
+bash scripts/build-faults.sh
 python3 scripts/test-qemu.py

@@ -10,7 +10,7 @@ use uefi::{
     },
 };
 
-fn read() -> Result<Vec<u8>, Status> {
+pub fn read() -> Result<Vec<u8>, Status> {
     let mut fs = boot::get_image_file_system(boot::image_handle()).map_err(|e| e.status())?;
     let mut root = fs.open_volume().map_err(|e| e.status())?;
     let handle = root
@@ -60,9 +60,8 @@ pub fn own_path() -> Result<String, Status> {
     Ok(name)
 }
 
-pub fn load() -> Result<Config, String> {
-    let bytes = read().map_err(|s| format!("Config read: {s:?}"))?;
-    let source = core::str::from_utf8(&bytes).map_err(|_| String::from("Config is not UTF-8"))?;
+pub fn validate(bytes: &[u8]) -> Result<Config, String> {
+    let source = core::str::from_utf8(bytes).map_err(|_| String::from("Config is not UTF-8"))?;
     let config = config::parse(source)?;
     let own = own_path().map_err(|s| format!("Cannot verify own EFI path: {s:?}"))?;
     if config
@@ -73,4 +72,15 @@ pub fn load() -> Result<Config, String> {
         return Err("Configuration points to EutherBoot itself".into());
     }
     Ok(config)
+}
+pub fn load() -> Result<Config, String> {
+    let mut store = crate::storage::UefiStore::open()?;
+    if boot_core::transaction::pending(&mut store)? {
+        return Err(
+            "Unfinished configuration save. F3 opens recovery; automatic boot disabled.".into(),
+        );
+    }
+    drop(store);
+    let bytes = read().map_err(|s| format!("Config read: {s:?}"))?;
+    validate(&bytes)
 }

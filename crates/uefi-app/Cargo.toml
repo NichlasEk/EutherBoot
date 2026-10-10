@@ -10,3 +10,4 @@ font8x8 = { version = "0.3", default-features = false, features = ["unicode"] }
 
 [features]
 qemu-debug = []
+test-faults = ["qemu-debug"]

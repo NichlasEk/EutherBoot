@@ -9,13 +9,14 @@ use serde::Deserialize;
 pub const MAX_BYTES: usize = 16 * 1024;
 pub const MAX_ENTRIES: usize = 16;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Config {
     entries: Vec<Entry>,
     default_index: usize,
     timeout: u16,
+    theme: String,
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Entry {
     id: String,
     name: String,
@@ -38,6 +39,9 @@ impl Config {
     }
     pub fn default_index(&self) -> usize {
         self.default_index
+    }
+    pub fn theme(&self) -> &str {
+        &self.theme
     }
     pub fn timeout(&self) -> u16 {
         self.timeout
@@ -119,8 +123,8 @@ pub fn parse(source: &str) -> Result<Config, String> {
     if raw.boot.timeout > 3600 {
         return Err("boot.timeout must be 0..3600 seconds".into());
     }
-    if raw.boot.theme != "system-regis" {
-        return Err("boot.theme: only system-regis is supported".into());
+    if !matches!(raw.boot.theme.as_str(), "system-regis" | "text") {
+        return Err("boot.theme: expected system-regis or text".into());
     }
     if raw.entry.is_empty() || raw.entry.len() > MAX_ENTRIES {
         return Err("Expected 1..16 EFI entries".into());
@@ -172,6 +176,7 @@ pub fn parse(source: &str) -> Result<Config, String> {
         entries,
         default_index,
         timeout: raw.boot.timeout,
+        theme: raw.boot.theme,
     })
 }
 

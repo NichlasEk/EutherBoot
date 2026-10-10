@@ -8,12 +8,14 @@ freedom through understanding. No runtime network, telemetry or cloud services.
 The current prototype reads TOML from its own EFI volume, validates it strictly,
 displays configured EFI targets, and chainloads the selected application. It has
 configurable default/timeout, keyboard navigation, paginated menus and firmware
-text fallback. A separate EFI child demonstrates returning success and failure.
+text fallback. Its keyboard editor supports isolated drafts, validation, preview,
+confirmed saves with backup, and explicit recovery after interrupted saves. A separate EFI child demonstrates returning success and failure.
 No installed operating system, physical hardware or Secure Boot has been tested.
 
 ## Build and run
 
 Requirements: Rust with `x86_64-unknown-uefi`, Python 3.11+, QEMU x86_64 and OVMF.
+GPT/FAT runs additionally need `sgdisk`, `mkfs.fat` and mtools (`mcopy`, `mtype`).
 Tested with Rust 1.99.0 and QEMU 11.1.2. Cargo.lock pins dependencies. Install the
 target with `rustup target add x86_64-unknown-uefi`. Scripts also recognize the
 isolated rustup installation under `.tools/` without changing the host compiler.
@@ -22,18 +24,22 @@ isolated rustup installation under `.tools/` without changing the host compiler.
 ./scripts/build.sh
 python3 scripts/qemu.py                 # interactive window
 ./scripts/validate-config.sh eutherboot.toml
-./scripts/test.sh                       # shared Rust tests + 20 OVMF cases
+./scripts/test.sh                       # 17 Rust tests + 29 OVMF cases
 ```
 
 Override `OVMF_CODE` and `OVMF_VARS` if needed. Defaults are Arch Linux's
 `/usr/share/edk2/x64/OVMF_{CODE,VARS}.4m.fd`; use a matching firmware pair.
-The QEMU runner copies the binary, config and test child into a unique disposable
-FAT directory, and copies the firmware variable store. It attaches no host disk,
-ESP or network interface. Exiting the runner removes the temporary storage.
+Interactive QEMU runs copy the binary, config and child into a disposable
+128 MiB GPT disk containing a 64 MiB FAT32 ESP, and copy the firmware variable
+store. Configuration-only regression cases also use directory-backed FAT.
+`--disk-image` selects the GPT/FAT image explicitly for a headless run. It attaches no host disk,
+ESP or network interface. Exiting the runner removes the temporary storage, including edits made inside
+the VM. The repository example is never modified by the guest.
 
 Binaries: `artifacts/EutherBoot.efi`, `artifacts/TestChild.efi`.
 Checksums: `artifacts/SHA256SUMS`.
-Logs/screenshots: `artifacts/qemu-<width>x<height>-<scenario>-<config-case>/`.
+Logs/screenshots: `artifacts/qemu-<width>x<height>-<scenario>-<config-case>/` (suffix `-disk` for
+GPT runs); editor evidence is under `artifacts/editor-<case>-<width>x<height>/`.
 Artifacts, target output and local tools are intentionally ignored by Git.
 The supplied build enables EutherBoot's `qemu-debug` feature (port 0xe9).
 Normal builds without this feature have no debug-port writes. The independent
@@ -60,14 +66,14 @@ path = '\EFI\EutherBoot\TestChild.efi'
 ```
 
 `default` must match a unique entry ID. `timeout` is 0..3600 seconds; zero or
-omission means wait indefinitely. The only supported theme is `system-regis`
-(the default). A positive timeout starts the default once, after the initial
+omission means wait indefinitely. Appearance is `system-regis` (the default) or `text`. A positive timeout starts the default once, after the initial
 menu appears. **Any key cancels it**, including keys with no other action.
 Load failures and returning children retain the menu and never restart the timer.
 
 The entire configuration is rejected for unknown fields, invalid TOML/UTF-8,
 unsupported types/themes, missing/duplicate IDs, duplicate case-insensitive
 paths, an unresolved default or a reference to EutherBoot's own loaded path.
+Unfinished saves (`.new` or `.txn` present) also block automatic boot.
 On error, no configured targets are enabled and no timer is armed; the error
 appears in text mode with read-only inspection and return-to-firmware available.
 The host checker cannot verify firmware-specific self-reference or file existence.
@@ -77,7 +83,7 @@ digits, `-` or `_`, printable ASCII names of 1..48 characters, and ASCII paths
 up to 240 bytes. Paths must start with `\EFI\`, end in `.efi`, and cannot use
 traversal, empty components, whitespace, wildcards or short-name `~` aliases.
 These restrictions make the initial graphical renderer/path handling explicit.
-Unicode entry names, other themes and `type = "firmware"` are **not implemented**;
+Unicode entry names, additional themes and `type = "firmware"` are **not implemented**;
 unsupported values produce errors. The built-in firmware-return action simply
 returns to the caller; it does not open firmware settings or change BootOrder.
 
@@ -85,12 +91,57 @@ returns to the caller; it does not open firmware settings or change BootOrder.
 
 - Up/Down: select, with wrapping and automatic page changes.
 - Enter: start the selected EFI entry, inspect configuration or return to firmware.
-- F2: use firmware text output for the remainder of the run.
+- F2: use firmware text output for the current menu session.
+- F3: open the configuration editor in read-only mode.
 - Escape: return to the firmware caller.
 - In the test child: Enter returns SUCCESS; Escape returns ABORTED.
 
-Configuration inspection is read-only and also switches to text mode. There is
-no configuration editor, persistent preference save or installer yet.
+The menu's configuration summary is read-only and switches to text mode. The
+editor is opened with F3. No firmware-variable preferences or installer exist.
+
+## Configuration editor
+
+Run `python3 scripts/qemu.py`, then press **F3**. Inspection does not write.
+Press **E** to begin a separate draft. Up/Down selects the entry to edit.
+
+| Key | Draft action |
+| --- | --- |
+| D | Make the selected entry the default |
+| T | Enter timeout in seconds |
+| G | Toggle System Regis graphics / text appearance |
+| A | Add an entry by ID, name and EFI path |
+| R | Remove the selected entry after confirmation |
+| N / P | Change the selected entry's name / path |
+| V | Validate the draft with the shared parser and self-reference check |
+| F5 | Preview without booting or changing the live configuration |
+| S | Validate and open a save confirmation; only Y writes |
+| Escape | Confirm discarding the draft and return to the menu |
+
+Field prompts accept Enter, Backspace, F4 to clear and Escape to cancel. Removing
+the default does not silently select another entry: choose a replacement with D.
+An invalid draft cannot be saved. Saving regenerates TOML formatting/comments;
+the previous file is preserved byte-for-byte in `eutherboot.toml.bak`.
+
+After save, settings are reloaded for the menu, but automatic boot remains disabled
+for that session. A configured positive timeout takes effect on the next boot.
+If a save fails, exit the draft with Escape and reopen F3 to inspect/recover; a
+failure may leave staging files and does not imply the disk is unchanged.
+
+Recovery is explicit in F3's read-only mode:
+
+- **B**, then Y: restore the validated backup; the backup itself is retained.
+- **C**, then Y: keep the validated current file and remove pending save data.
+
+Both choices discard pending staged data. If neither the live file nor the backup
+is valid, external repair is required. The editor starts from a valid existing
+configuration; creating a first configuration or repairing raw malformed TOML
+inside the editor is not implemented.
+
+The save stages `.new`, verifies readback, creates `.txn`, moves the previous
+valid file to `.bak`, installs the verified candidate and removes `.txn` after
+final readback. Recovery is tested at three interruption boundaries. This is a
+recoverable multi-file protocol, **not a guarantee of FAT power-loss atomicity**.
+No automatic disk repair or NVRAM writes occur.
 
 ## Focused virtual tests
 
@@ -103,8 +154,16 @@ python3 scripts/qemu.py --test --config-case timeout
 python3 scripts/qemu.py --test --config-case cancel
 python3 scripts/qemu.py --test --config-case unknown
 python3 scripts/qemu.py --test --config-case many --width 640 --height 480
+python3 scripts/editor-qemu.py --case save
+python3 scripts/editor-qemu.py --case readonly
+./scripts/build-faults.sh
+python3 scripts/editor-qemu.py --case after-backup
 ```
 
 See [architecture](ARCHITECTURE.md), [roadmap](ROADMAP.md) and
 [validation evidence](docs/VALIDATION.md). This remains a virtual-development
 prototype; physical installation requires separate approval and rollback planning.
+
+Fault-injection tests use the separate `EutherBoot-faults.efi` artifact. Its
+`test-faults` feature is excluded from the normal binary. Test scripts create
+only temporary image files; they do not accept a physical disk destination.

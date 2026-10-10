@@ -2,19 +2,23 @@
 """Isolated OVMF runner. No host disks, network, or persistent firmware state."""
 import argparse, json, os, pathlib, shutil, socket, subprocess, tempfile, time
 import qemu_cases
+import virtual_disk
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 p = argparse.ArgumentParser()
 p.add_argument('--test', action='store_true')
+p.add_argument('--disk-image', action='store_true', help='Use disposable GPT/FAT (automatic for interactive runs)')
 p.add_argument('--config-case', choices=qemu_cases.CASES, default='sample')
 p.add_argument('--scenario', choices=('return', 'abort', 'missing', 'invalid'), default='return')
 p.add_argument('--width', type=int, default=1024)
 p.add_argument('--height', type=int, default=768)
 a = p.parse_args()
+use_disk = a.disk_image or not a.test
 code = pathlib.Path(os.environ.get('OVMF_CODE', '/usr/share/edk2/x64/OVMF_CODE.4m.fd'))
 variables = pathlib.Path(os.environ.get('OVMF_VARS', '/usr/share/edk2/x64/OVMF_VARS.4m.fd'))
 for path in (code, variables, ROOT/'artifacts/EutherBoot.efi', ROOT/'artifacts/TestChild.efi'):
     if not path.is_file(): p.error(f'Missing {path}; build first or set OVMF_CODE / OVMF_VARS')
 out = ROOT/'artifacts'/f'qemu-{a.width}x{a.height}-{a.scenario}-{a.config_case}'
+if use_disk: out = out.with_name(out.name+'-disk')
 out.mkdir(parents=True, exist_ok=True)
 with tempfile.TemporaryDirectory(prefix='eutherboot-') as tmp:
     tmp = pathlib.Path(tmp)
@@ -26,13 +30,15 @@ with tempfile.TemporaryDirectory(prefix='eutherboot-') as tmp:
     elif a.scenario == 'invalid':
         (esp/'EFI/EutherBoot/TestChild.efi').write_bytes(b'Not a PE/COFF EFI executable.\n')
     qemu_cases.prepare(esp, ROOT, a.config_case)
+    disk = virtual_disk.create(esp,tmp) if use_disk else None
+    disk_arg = f'if=virtio,format=raw,file={disk}' if disk else f'format=raw,file=fat:rw:{esp}'
     shutil.copy2(variables, tmp/'vars.fd')
     log = out/'debug.log'; log.write_text('')
     args = ['qemu-system-x86_64', '-machine', 'q35', '-accel', 'tcg', '-m', '256',
             '-net', 'none', '-no-reboot', '-vga', 'none', '-device', f'VGA,xres={a.width},yres={a.height}',
             '-drive', f'if=pflash,format=raw,readonly=on,file={code}',
             '-drive', f'if=pflash,format=raw,file={tmp}/vars.fd',
-            '-drive', f'format=raw,file=fat:rw:{esp}',
+            '-drive', disk_arg,
             '-debugcon', f'file:{log}', '-global', 'isa-debugcon.iobase=0xe9',
             '-qmp', f'unix:{tmp}/qmp,server=on,wait=off', '-serial', f'file:{out}/serial.log']
     if a.test: args += ['-display', 'none']
@@ -40,6 +46,7 @@ with tempfile.TemporaryDirectory(prefix='eutherboot-') as tmp:
         proc = subprocess.Popen(args, stdout=err, stderr=err)
         try:
             if not a.test:
+                print("Disposable QEMU disk: configuration changes are discarded when the VM closes.", flush=True)
                 proc.wait()
             else:
                 deadline = time.monotonic()+60

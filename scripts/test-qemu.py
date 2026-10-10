@@ -8,14 +8,20 @@ import subprocess
 import sys
 import qemu_cases
 script = pathlib.Path(__file__).with_name('qemu.py')
-cases = [[], ['--width','640','--height','480']]
+cases = [[], ['--width','640','--height','480'], ['--disk-image']]
 cases += [['--scenario',s] for s in ('abort','missing','invalid')]
 cases += [['--config-case',s] for s in qemu_cases.CASES if s != 'sample']
 # Exercise scrolling at the smallest supported framebuffer resolution.
 cases += [['--config-case','many','--width','640','--height','480']]
 
-def run(args):
-    with subprocess.Popen([sys.executable,str(script),'--test',*args],
+cases = [(script, ['--test',*args]) for args in cases]
+editor = script.with_name('editor-qemu.py')
+cases += [(editor,['--case',case]) for case in ('discard','save','invalid','readonly','after-stage','after-backup','after-install')]
+cases += [(editor,['--case','save','--width','640','--height','480'])]
+
+def run(case):
+    program, args = case
+    with subprocess.Popen([sys.executable,str(program),*args],
                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                           text=True, start_new_session=True) as proc:
         try:
