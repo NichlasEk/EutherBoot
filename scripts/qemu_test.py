@@ -12,7 +12,7 @@ VARS=Path(os.environ.get('OVMF_VARS','/usr/share/edk2/x64/OVMF_VARS.4m.fd'))
 class VM:
     def __init__(self,tmp,disk,out,iteration=1,width=1024,height=768,readonly=False,memory=256,cpu=None,
                  firmware_code=CODE,firmware_vars=VARS,secure=False,
-                 extra_disks=(),accel='tcg',serial_socket=None):
+                 extra_disks=(),accel='tcg',serial_socket=None,user_network=False):
         self.base=out/f'boot-{iteration}';self.base.mkdir(exist_ok=True)
         self.log=self.base/'debug.log';self.log.write_text('')
         vars_path=tmp/f'vars-{iteration}.fd';shutil.copy2(firmware_vars,vars_path)
@@ -25,6 +25,8 @@ class VM:
               '-drive',f'if=virtio,format=raw,file={disk},readonly={"on" if readonly else "off"}',
               '-debugcon',f'file:{self.log}','-global','isa-debugcon.iobase=0xe9',
               '-serial',f'file:{self.base}/serial.log','-qmp',f'unix:{qmp},server=on,wait=off']
+        if user_network:
+            index=args.index('-net');args[index:index+2]=['-nic','user,model=virtio-net-pci']
         for extra,fmt in extra_disks:
             if not Path(extra).is_file():raise ValueError('Extra disk must be a regular image file')
             if fmt not in ('raw','qcow2'):raise ValueError('Unsupported disk format')

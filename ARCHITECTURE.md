@@ -395,4 +395,31 @@ The offline guest masks `systemd-time-wait-sync.service` through its kernel
 command line because the official image otherwise holds first-boot keyring
 initialization and multi-user.target waiting for network time. This is an explicit
 fixture adjustment, not a loader default or a modification to the base image.
-Arch Secure Boot, kernel upgrades and an ISO installation are separate gates.
+Arch Secure Boot and an ISO installation remain separate gates. Kernel upgrades
+are covered by the additional guest update integration described below.
+
+## Arch guest update integration
+
+The optional `arch-update-qemu.py` runner adds a Linux-side prototype, isolated
+under `tests/arch/update/`. It does not change the UEFI loader. The guest installs
+a stock-linux mkinitcpio preset extension and post hook, and a pacman
+pre-transaction guard. A full guest upgrade produces a UKI on the root filesystem,
+then publishes it to one stable EFI path. The boot entry is unchanged on later
+rebuilds. This uses mkinitcpio's normal post-hook API, not kernel-install; those
+two orchestration paths must not be mixed without revisiting hook semantics.
+
+Publication checks the intended ESP's PARTUUID, exact mount point, FAT type,
+write access and minimum free space. A UKI identification check, exclusive lock,
+temporary file, byte comparison and filesystem sync precede replacement. A saved
+previous image is diagnostic only: its old kernel modules are not retained by
+this prototype. FAT rename is not claimed to be power-loss atomic, and a failed
+post hook cannot undo a completed pacman package transaction.
+
+The integration oracle verifies a real package-version change and two subsequent
+boots whose `uname -r` matches the new installed module directory. Negative cases
+exercise missing/read-only/wrong ESPs and malformed UKIs. One explicitly staged
+partial-file interruption is followed by QEMU process termination and another
+boot. This establishes that the selected boot file survives that interruption;
+it does not prove arbitrary interruption safety during filesystem metadata writes.
+All disks and firmware variables are disposable files; only the upgrade boot has
+QEMU user-mode NAT. No host sharing or forwarded services are configured.

@@ -18,6 +18,10 @@ fall back to another volume. LoadFile2 delivery now reaches Linux PID 1; returni
 copy semantics and cleanup. Installed Arch now boots its own kernel/initramfs from
 a separate virtual ESP with persistent root writes across two cold boots. Next:
 broader kernel/stub compatibility and initrd memory/failure limits.
+The optional Arch update fixture now exercises a guest pacman upgrade, automatic
+UKI publication and boot into the updated kernel, plus selected refusal and
+interruption cases. This is not yet a host installer or a complete recovery design;
+LTS integration and retained old kernel/module generations remain open.
 Secure Boot acceptance/rejection is demonstrated with disposable owner keys in
 OVMF, including a signed diagnostic UKI; production/hardware trust remains open.
 Event-based input, richer editor styling and Unicode remain refinements.

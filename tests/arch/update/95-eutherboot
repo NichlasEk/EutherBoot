@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# Other kernel presets are outside this prototype's scope.
+[[ ${3:-} == /var/lib/eutherboot/arch-linux.efi ]] || exit 0
+exec /usr/local/lib/eutherboot/publish "$3"

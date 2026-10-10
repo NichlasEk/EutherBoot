@@ -1,0 +1,16 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = linux
+Target = mkinitcpio
+Target = systemd
+Target = systemd-ukify
+Target = intel-ucode
+Target = amd-ucode
+
+[Action]
+Description = Checking EutherBoot ESP before updating boot components...
+When = PreTransaction
+Exec = /usr/local/lib/eutherboot/publish --check
+AbortOnFail

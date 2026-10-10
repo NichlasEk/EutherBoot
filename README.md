@@ -159,6 +159,30 @@ remain cached. Logs, menu captures and `result.json` are under
 This tests an upstream preinstalled system, not installation from an Arch ISO
 or installed Arch under Secure Boot.
 
+## Arch kernel-update experiment
+
+```sh
+python3 scripts/prepare-arch.py
+python3 scripts/arch-update-qemu.py
+```
+
+This optional online test installs the update integration **inside a disposable
+Arch guest**, runs a full `pacman -Syu` with UKI build dependencies, and boots the
+new kernel through EutherBoot. Arch's normal mkinitcpio hook generates the UKI;
+a post hook publishes it to the fixed `\EFI\Linux\arch-linux.efi` path.
+The guest's pre-transaction check refuses a missing, wrong or read-only ESP.
+
+Only the first boot has QEMU user-mode NAT, without forwarded ports or shared
+host directories. Subsequent boots are offline. No host package installation,
+privileged host mount or firmware change is performed. The test also checks
+refusal paths, replacement of an existing UKI, and reboot after a simulated power
+cut with an abandoned partial staging file. Evidence is written under
+`artifacts/arch-update-qemu/`.
+
+This is a QEMU prototype, not a host installer. LTS recovery, retained old modules,
+Secure Boot signing and comprehensive power-loss handling remain open. See the
+[guest-only update workflow and limits](tests/arch/update/README.md).
+
 ## Linux EFI-stub and UKI
 
 An x86_64 Linux kernel built with `CONFIG_EFI_STUB` can be copied under an `.efi`

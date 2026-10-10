@@ -1,4 +1,4 @@
-# Validation · 2026-10-10 · Installed Arch and LoadFile2
+# Validation · 2026-10-10 · Arch kernel updates and LoadFile2
 
 Host: Rust 1.99.0, QEMU 11.1.2 TCG/q35, ordinary OVMF, x86_64 UEFI target.
 This is virtual-development evidence: Linux reaches a generated diagnostic PID 1,
@@ -47,8 +47,58 @@ extending the shared QEMU/disk helpers; all three passed. Firmware source and
 validated EFI artifact are unchanged. The 68-case matrix recorded below is the
 prior LoadFile2 run, not a claim that all 68 were repeated for this fixture change.
 TCG fallback exists in the Arch runner but this installed-Arch result used KVM.
-An ISO installation, guest kernel updates, installed-Arch Secure Boot and physical
-hardware remain outside this result.
+An ISO installation, installed-Arch Secure Boot and physical hardware remain
+outside this result. The separate kernel-update experiment follows below.
+
+## Arch kernel update and UKI publication
+
+Command: `python3 scripts/arch-update-qemu.py` after preparing the pinned image.
+This additional experiment uses QEMU/KVM, ordinary OVMF, 3 GiB RAM, a disposable
+1 GiB ESP and an overlay of the same signed Arch basic image. Only the first boot
+has user-mode NAT; there are no forwarded ports or shared host directories.
+The host package manager, boot files, EFI variables and keys are not involved.
+
+The guest executes a full
+`pacman -Syu --noconfirm --needed binutils systemd-ukify`. It installs a stock-linux
+mkinitcpio preset extension, a publication post hook, and a pre-transaction ESP
+check. The actual observed change is Linux `7.2.7-arch1-1` to `7.2.9-arch1-1`
+(package `linux 7.2.7.arch1-1` to `7.2.9.arch1-1`). The pacman log reports normal
+initcpio rebuilding and `EUTHERBOOT_UKI_PUBLISHED kernel=7.2.9-arch1-1`.
+
+The new UKI is placed at `\EFI\Linux\arch-linux.efi`. The next two cold boots
+select that ordinary EFI entry and independently verify the new running kernel,
+installed module version, Arch identity, systemd PID 1, expected root device,
+active multi-user.target, no failed units, and the published UKI's SHA-256.
+There is no external LoadFile2 initrd on these boots: the UKI embeds its initrd.
+
+Between the two updated-kernel boots, the guest exercises:
+
+| Case | Required outcome |
+| --- | --- |
+| ESP unmounted | Actual cached-kernel pacman transaction aborts with the expected missing-ESP reason; package state and UKI hash preserved |
+| ESP read-only | Preflight rejects with the expected reason |
+| Original Arch ESP mounted at the integration mount point | Wrong PARTUUID rejected |
+| Malformed staged UKI | Publication rejected; active UKI unchanged |
+| Successful cached-kernel reinstall | Standard hook republishes; previous image hash equals the formerly active image, new active file equals generated staging file |
+| Abandoned partial staging file | File is synced, QEMU is killed without shutdown, subsequent cold boot still reaches the selected new kernel |
+
+This does not claim general FAT power-loss atomicity: the abrupt termination
+occurs after a partial staging file is flushed, not during active-file rename.
+The previous UKI is diagnostic only, since old modules are not retained.
+LTS recovery, build/I/O/full-disk fault injection, encrypted roots, signing and
+physical installation remain open. A post-transaction failure cannot undo
+pacman's completed package changes.
+
+Evidence: `artifacts/arch-update-qemu/boot-{1,2,3}/` serial/debug/QEMU logs and menu
+screenshots, `result.json`, and `updated-arch.efi` read back independently using
+mtools. The original QCOW2 hash and unchanged EutherBoot binary read back from
+the ESP are checked at the end. Disposable disks are removed after the test.
+The final read-back UKI SHA-256 is
+`aad348987236e34097f0e30bfc9c2d8822d2f3161dd59361f8416e8c785c6d02`.
+The normal read-only editor QEMU case also passed after extending the shared VM
+helper with opt-in networking. Python compilation, shell syntax and diff checks
+passed. Firmware source and the previously validated EFI binary are unchanged;
+the full earlier 68-case matrix was not rerun for this integration-only change.
 
 ## Shared parser and builds
 
