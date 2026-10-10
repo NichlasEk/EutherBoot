@@ -5,16 +5,17 @@ import shutil
 import subprocess
 
 
-def create(source: Path, temporary: Path) -> Path:
+def create(source: Path, temporary: Path, esp_mib: int = 64) -> Path:
+    if not 64 <= esp_mib <= 1024: raise ValueError('ESP size outside fixture bounds')
     disk = temporary/'disk.img'
     fat = temporary/'fat.img'
     # Exclusive creation prevents accidentally reusing an existing file/device.
     with disk.open('xb') as f:
-        f.truncate(128*1024*1024)
+        f.truncate((esp_mib+64)*1024*1024)
     with fat.open('xb') as f:
-        f.truncate(64*1024*1024)
+        f.truncate(esp_mib*1024*1024)
     for cmd in [
-        ['sgdisk','-n','1:2048:133119','-t','1:ef00',str(disk)],
+        ['sgdisk','-n',f'1:2048:{2048+esp_mib*2048-1}','-t','1:ef00',str(disk)],
         ['mkfs.fat','-F','32',str(fat)],
         ['mcopy','-s','-i',str(fat),str(source/'EFI'),'::/'],
     ]:

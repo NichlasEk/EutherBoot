@@ -15,8 +15,9 @@ launch or import into an unsaved configuration draft. Persisted targets can sele
 an ESP by its unique partition GUID. A separate EFI child demonstrates returning success and failure.
 Linux EFI-stub and unsigned UKI boots reach a generated minimal initramfs PID 1 in
 QEMU, including a second ESP. Disposable owner-key Secure Boot tests also cover
-EFI authentication and a signed diagnostic UKI. No installed distribution or
-physical hardware has been tested.
+EFI authentication and a signed diagnostic UKI. The official installed Arch basic
+image also boots through EutherBoot with its own initramfs, systemd and Btrfs root;
+two cold boots verify a persistent guest write. Physical hardware remains untested.
 
 ## Build and run
 
@@ -128,6 +129,35 @@ These restrictions make the initial graphical renderer/path handling explicit.
 Unicode entry names, additional themes and `type = "firmware"` are **not implemented**;
 unsupported values produce errors. The built-in firmware-return action simply
 returns to the caller; it does not open firmware settings or change BootOrder.
+
+## Installed Arch in QEMU
+
+```sh
+python3 scripts/prepare-arch.py  # download and verify the pinned official basic image
+python3 scripts/arch-qemu.py     # two cold boots and a persistent-write check
+```
+
+Additional tools: curl, GnuPG, qemu-img and btrfs-progs. No sudo, loop device or
+host mount is needed. The signed download is about 513 MiB; preparation uses
+sparse regular files for the 40 GiB virtual disk. Allow several GiB of free space.
+The runner uses KVM when accessible, otherwise TCG (this Arch result used KVM).
+
+EutherBoot receives a separate read-only 512 MiB virtual ESP containing the
+image's own kernel and initramfs. Arch runs on a disposable QCOW2 overlay;
+its original image and supplied GRUB remain intact. Firmware variables are
+fresh temporary copies. The VM has no network. For this offline fixture only,
+`systemd.mask=systemd-time-wait-sync.service` avoids waiting indefinitely for
+network time during first-boot keyring initialization.
+
+The test logs in with the image's public `arch` / `arch` credentials, checks real
+systemd PID 1, the expected Btrfs root/PARTUUID, installed packages, active
+multi-user.target and no failed units. It writes a guest marker, powers off,
+and checks it after a second cold boot with a different boot ID. Both temporary
+disks are removed after the run; the verified download and extracted payloads
+remain cached. Logs, menu captures and `result.json` are under
+`artifacts/arch-qemu/`. See [fixture provenance](tests/arch/README.md).
+This tests an upstream preinstalled system, not installation from an Arch ISO
+or installed Arch under Secure Boot.
 
 ## Linux EFI-stub and UKI
 

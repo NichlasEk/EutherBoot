@@ -7,7 +7,7 @@
 | C · First boot | Demonstrated in QEMU | Independent EFI child starts and returns; missing/invalid image and ABORTED cases preserve the menu |
 | D · Configuration | Demonstrated in QEMU | Shared Rust TOML parser, own-volume config reads, optional GPT partition selectors, strict validation, default and cancellable one-shot timeout |
 | E · Editor | Demonstrated in QEMU | Keyboard drafts, discovery import, partition selector editing, preview, confirmed save, backup and explicit recovery on GPT/FAT |
-| F · Compatibility | Started in QEMU | Multiple GPT ESPs, Linux EFI-stub with LoadFile2 initrd/command line and UKI reach diagnostic Linux PID 1; virtual owner-key Secure Boot tested; installed distributions and broader firmware remain |
+| F · Compatibility | Started in QEMU | Multiple GPT ESPs, Linux EFI-stub with LoadFile2 initrd/command line and UKI reach diagnostic Linux PID 1; virtual owner-key Secure Boot tested; installed Arch reaches systemd/Btrfs root across two cold boots; broader distributions and firmware remain |
 | G · Hardware | Not authorized or tested | Dedicated machine, separately approved installation, known-good boot path and rollback |
 
 Read-only discovery is demonstrated: F4, stable partition GUIDs, full device paths,
@@ -15,8 +15,9 @@ exact self-copy exclusion, duplicate-GUID rejection and no automatic defaults.
 Cross-volume selections now persist through TOML/editor and resolve again after
 reboot, including reordered GPT partitions. Missing/ambiguous selectors never
 fall back to another volume. LoadFile2 delivery now reaches Linux PID 1; returning protocol consumers verify
-copy semantics and cleanup. Next: broader kernel/stub compatibility, an installed
-distribution on a disposable virtual disk, and initrd memory/failure limits.
+copy semantics and cleanup. Installed Arch now boots its own kernel/initramfs from
+a separate virtual ESP with persistent root writes across two cold boots. Next:
+broader kernel/stub compatibility and initrd memory/failure limits.
 Secure Boot acceptance/rejection is demonstrated with disposable owner keys in
 OVMF, including a signed diagnostic UKI; production/hardware trust remains open.
 Event-based input, richer editor styling and Unicode remain refinements.

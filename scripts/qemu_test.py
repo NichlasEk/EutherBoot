@@ -11,19 +11,27 @@ VARS=Path(os.environ.get('OVMF_VARS','/usr/share/edk2/x64/OVMF_VARS.4m.fd'))
 
 class VM:
     def __init__(self,tmp,disk,out,iteration=1,width=1024,height=768,readonly=False,memory=256,cpu=None,
-                 firmware_code=CODE,firmware_vars=VARS,secure=False):
+                 firmware_code=CODE,firmware_vars=VARS,secure=False,
+                 extra_disks=(),accel='tcg',serial_socket=None):
         self.base=out/f'boot-{iteration}';self.base.mkdir(exist_ok=True)
         self.log=self.base/'debug.log';self.log.write_text('')
         vars_path=tmp/f'vars-{iteration}.fd';shutil.copy2(firmware_vars,vars_path)
         qmp=tmp/f'qmp-{iteration}'
         self.err=(self.base/'qemu.log').open('w')
-        args=['qemu-system-x86_64','-machine','q35,smm=on' if secure else 'q35','-accel','tcg','-m',str(memory),'-net','none','-no-reboot','-display','none',
+        args=['qemu-system-x86_64','-machine','q35,smm=on' if secure else 'q35','-accel',accel,'-m',str(memory),'-net','none','-no-reboot','-display','none',
               '-vga','none','-device',f'VGA,xres={width},yres={height}',
               '-drive',f'if=pflash,format=raw,readonly=on,file={firmware_code}',
               '-drive',f'if=pflash,format=raw,file={vars_path}',
               '-drive',f'if=virtio,format=raw,file={disk},readonly={"on" if readonly else "off"}',
               '-debugcon',f'file:{self.log}','-global','isa-debugcon.iobase=0xe9',
               '-serial',f'file:{self.base}/serial.log','-qmp',f'unix:{qmp},server=on,wait=off']
+        for extra,fmt in extra_disks:
+            if not Path(extra).is_file():raise ValueError('Extra disk must be a regular image file')
+            if fmt not in ('raw','qcow2'):raise ValueError('Unsupported disk format')
+            args += ['-drive',f'if=virtio,format={fmt},file={extra}']
+        if serial_socket is not None:
+            index=args.index('-serial');args[index+1]='chardev:guestserial'
+            args += ['-chardev',f'socket,id=guestserial,path={serial_socket},server=on,wait=off,logfile={self.base}/serial.log']
         if cpu:args += ['-cpu',cpu]
         if secure:args += ['-global','driver=cfi.pflash01,property=secure,value=on']
         self.proc=subprocess.Popen(args,stdout=self.err,stderr=self.err)

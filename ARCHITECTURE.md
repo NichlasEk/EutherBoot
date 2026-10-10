@@ -335,7 +335,7 @@ The independent child reports its actual LoadedImage device's partition GUID,
 proving which volume supplied identical paths. Read/write-enabled virtual disks
 are hashed in full before/after the session to check absence of writes, rather
 than merely relying on a read-only QEMU drive setting. Broader Secure Boot policies,
-installed distributions and hardware remain separate gates.
+broader installed distributions and hardware remain separate gates.
 
 
 ## Persisted cross-volume targets
@@ -373,3 +373,26 @@ protocol handle survives the return to the editor. Import requires a valid live
 config and no pending transaction, respects 16-entry/path bounds, and never writes
 or launches. The existing S/Y transaction stores the draft and exact previous
 backup on the own volume. Import cancellation/discard leaves all volumes unchanged.
+
+## Installed Arch integration boundary
+
+The optional Arch fixture extends the diagnostic PID 1 tests with an official,
+signed, pinned preinstalled distribution. Preparation verifies the detached
+signature using a pinned public key in a temporary GPG home, then extracts only
+its own kernel/initramfs from sparse regular files using `btrfs restore`.
+No privileged mounts, host partitions or host firmware interfaces are used.
+
+EutherBoot runs on a separate read-only GPT ESP. A QCOW2 overlay of Arch's original
+disk supplies the writable Btrfs root and its original ESP/GRUB. Root selection
+uses the image's GPT PARTUUID. The image's existing loader is not overwritten.
+The two boots share only the disposable root overlay; each gets fresh OVMF vars.
+An independent serial-login oracle checks PID 1, OS identity, root filesystem,
+packages, service state and a durable guest file, rather than trusting an EFI
+launch marker. SHA-256 checks also verify that the original image and EutherBoot
+ESP did not change. Socket output is continuously drained to avoid blocking QEMU.
+
+The offline guest masks `systemd-time-wait-sync.service` through its kernel
+command line because the official image otherwise holds first-boot keyring
+initialization and multi-user.target waiting for network time. This is an explicit
+fixture adjustment, not a loader default or a modification to the base image.
+Arch Secure Boot, kernel upgrades and an ISO installation are separate gates.

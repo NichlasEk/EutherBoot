@@ -1,9 +1,54 @@
-# Validation · 2026-10-10 · LoadFile2 initrd delivery
+# Validation · 2026-10-10 · Installed Arch and LoadFile2
 
 Host: Rust 1.99.0, QEMU 11.1.2 TCG/q35, ordinary OVMF, x86_64 UEFI target.
 This is virtual-development evidence: Linux reaches a generated diagnostic PID 1,
 including a locally signed UKI under an enforced OVMF owner-key policy.
-It is not evidence of an installed distribution or physical hardware boot.
+The separate installed Arch test below additionally exercises a real root
+filesystem and systemd through KVM. Physical hardware remains untested.
+
+## Installed Arch: two cold boots
+
+The official signed `Arch-Linux-x86_64-basic-20261001.604814.qcow2` was verified
+against the public arch-boxes primary fingerprint
+`1B9A16984A4E8CB448712D2AE0B78BF4326C6F8F` and published SHA-256
+`f9fa16c40e6ac9c03fd28a9ba12fa6ab58b5648ac444a6d27b31ee5bd9913186`.
+See [source/key provenance](../tests/arch/README.md).
+
+`python3 scripts/prepare-arch.py` extracts the image's own kernel and initramfs
+without host mounts. `python3 scripts/arch-qemu.py` runs ordinary OVMF/q35 with
+KVM, 2 GiB RAM, a separate read-only 512 MiB EutherBoot ESP and a writable QCOW2
+overlay of the original Arch disk. There is no network device. The original
+Arch ESP and GRUB are left in the source image; no fallback boot is claimed.
+
+Both cold boots passed the independent serial-login oracle:
+
+- Linux `7.2.7-arch1-1`, package `linux 7.2.7.arch1-1`, `systemd 262-1`, `base 3-3`.
+- PID 1 is systemd, `/etc/os-release` identifies Arch, and `/` is Btrfs on
+  `/dev/vdb3` with the expected root PARTUUID.
+- `multi-user.target` is active and there are no failed units at the check.
+- A random marker written under `/var/lib` in boot 1 survives graceful power-off
+  and boot 2; the kernel boot IDs differ.
+- Both boots report LoadFile2 size query/copy and EFI-stub launch before the
+  independent guest checks. Both guests shut down through systemd.
+- The original QCOW2 and EutherBoot ESP retain their pre-test SHA-256 values.
+
+The unadjusted offline image reached a usable login but held multi-user.target
+behind `systemd-time-wait-sync.service`, `time-sync.target` and first-boot
+`pacman-init.service`. The successful fixture explicitly adds
+`systemd.mask=systemd-time-wait-sync.service` to its kernel command line; this
+changes neither the base image nor EutherBoot's runtime defaults. The initial
+waiting state is saved in `artifacts/arch/offline-time-wait.log`.
+
+Evidence: `artifacts/arch/signature.txt`, `artifacts/arch/manifest.json`,
+`artifacts/arch-qemu/result.json` and per-boot serial/debug logs and PPM screenshots.
+Fresh extraction and the final two-boot runner were verified. The ordinary GPT
+chainload/return, editor save/reboot and editor read-only cases were rerun after
+extending the shared QEMU/disk helpers; all three passed. Firmware source and
+validated EFI artifact are unchanged. The 68-case matrix recorded below is the
+prior LoadFile2 run, not a claim that all 68 were repeated for this fixture change.
+TCG fallback exists in the Arch runner but this installed-Arch result used KVM.
+An ISO installation, guest kernel updates, installed-Arch Secure Boot and physical
+hardware remain outside this result.
 
 ## Shared parser and builds
 
@@ -253,8 +298,9 @@ VMs and these 8 protocol cases (**68 QEMU cases total**). Logs are
 
 ## Limits
 
-No installed distribution, physical machine, production Secure Boot trust store,
-multiple physical disks or hot-plug behavior has been demonstrated. Linux tests
+No physical machine, production Secure Boot trust store, multiple physical disks
+or hot-plug behavior has been demonstrated. Installed-distribution coverage is
+currently limited to the pinned Arch basic image under ordinary OVMF. Linux tests
 use one kernel version, one systemd stub and a diagnostic initramfs. Multiple
 initrds and arbitrary non-EFI kernel loading are absent. LoadFile2 does not
 authenticate external initrds or command lines. A pre-existing provider is rejected
