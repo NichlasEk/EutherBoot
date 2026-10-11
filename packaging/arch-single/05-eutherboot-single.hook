@@ -1,0 +1,46 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = linux
+Target = mkinitcpio
+Target = systemd
+Target = systemd-ukify
+Target = intel-ucode
+Target = amd-ucode
+
+[Trigger]
+Type = Package
+Operation = Install
+Operation = Upgrade
+Operation = Remove
+Target = nvidia
+Target = nvidia-open
+Target = nvidia-dkms
+Target = nvidia-open-dkms
+
+[Trigger]
+Type = Path
+Operation = Install
+Operation = Upgrade
+Operation = Remove
+Target = usr/lib/initcpio/*
+Target = usr/lib/firmware/*
+Target = usr/lib/modules/*/extramodules/
+Target = usr/src/*/dkms.conf
+Target = usr/lib/systemd/systemd
+Target = usr/lib/systemd/systemd-udevd
+Target = usr/bin/cryptsetup
+Target = usr/bin/lvm
+Target = usr/bin/mdadm
+Target = usr/bin/pdata_tools
+Target = usr/lib/libcryptsetup.so
+Target = usr/lib/libp11-kit.so
+Target = usr/lib/libpcsclite.so
+Target = usr/lib/modprobe.d/
+
+[Action]
+Description = Checking EutherBoot single UKI update capacity...
+When = PreTransaction
+Exec = /usr/bin/python3 /usr/local/lib/eutherboot-single/eutherboot-single.py preflight
+AbortOnFail

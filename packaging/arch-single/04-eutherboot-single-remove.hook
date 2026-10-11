@@ -1,0 +1,11 @@
+[Trigger]
+Operation = Remove
+Type = Package
+Target = linux
+Target = mkinitcpio
+
+[Action]
+Description = Protecting the active EutherBoot kernel integration...
+When = PreTransaction
+Exec = /usr/bin/python3 /usr/local/lib/eutherboot-single/eutherboot-single.py deny-remove
+AbortOnFail

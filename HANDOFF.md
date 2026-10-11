@@ -1,5 +1,79 @@
 # EutherBoot – System Regis och rescue-USB
 
+## Nu: EutherBoot installerat internt, GRUB borttaget — 2026-10-11
+
+Användaren bekräftade fysisk USB-direktstart och fungerande grafik och bad
+uttryckligen om bytet: **GRUB bort helt, Euther Rescue som återväg**. Bytet är
+nu utfört. Ingen partitionsändring, NVRAM-ändring eller automatisk omstart.
+
+- EutherBoot på intern `/boot/EFI/BOOT/BOOTX64.EFI`, samma hash som den fysiskt
+  provade releasefilen: `707ce74a51d1563ca757e0f044e7f6a02eda8804013c848d823a7c83d332eb65`.
+- En normal UKI: `/boot/EFI/Linux/arch-normal.efi`, kernel `7.2.9-arch1-1`.
+  Menyn visar **Arch Linux**, svenska, System Regis och 10 sekunders timeout.
+- GRUB-paket och `/boot/grub` borttagna. Separata normal-/fallback-initramfs
+  borttagna; kernelkällan och paketägd Intel-mikrokod är kvar.
+- **748 019 712 byte (713,4 MiB) ledigt** på ESP efter verifierad ombyggnad.
+- Säkerhetskopia av gamla ESP-filer och preset på rotpartitionen:
+  `/var/lib/eutherboot-single/backup`. Den är hashverifierad och är inte en
+  aktiv intern reservstart. Rescue-stickan är fortfarande räddningsvägen.
+- Enkel uppdateringsprofil installerad. Bygger på root, verifierar kärna och
+  cmdline, kopierar/synkar/hashkontrollerar ny UKI före namnbyte på ESP.
+  Ingen LTS eller intern generationshantering.
+- Värdens nya `rebuild`-kommando kördes och publicerade UKI:n korrekt. EFI- och
+  UKI-hashar kontrollerades, firmwareposter/bootordning är oförändrade.
+
+### Nästa session efter omstart
+
+Användaren ska **stänga av, ta ur Kingston DataTraveler-teststickan och starta
+från intern disk**. Befintlig firmwarepost heter `UEFI OS`. Ingen GRUB visas;
+EutherBoot ska starta Arch efter 10 sekunder eller Enter. Rescue General UDisk
+kan användas från tillfällig UEFI-meny vid problem.
+
+När användaren skriver ”jag är tillbaka”, kör agenten läsande kontroller:
+
+```sh
+cat /proc/cmdline
+uname -r
+findmnt -no SOURCE,FSTYPE,FSROOT /
+findmnt /boot
+lsblk -o NAME,TRAN,MODEL,SIZE,FSTYPE,LABEL,MOUNTPOINTS
+efibootmgr -v
+```
+
+Förväntad markör är **`eutherboot.internal=single-v1`**, Btrfs FSROOT `/@`
+och kernel `7.2.9-arch1-1` om inget paketbyte skett. Kontrollera menyväg och
+fungerande grafik med användaren. Saknad markör bevisar inte intern start.
+Fysisk intern start är **ännu inte provad**; nuvarande session startades via USB.
+Återbygg eller skriv inte om något bara för att användaren återkommer.
+
+### Verifiering och återställning
+
+`artifacts/single-qemu/result.json`: disponibel 1 GiB ESP, Btrfs `/@`,
+installation utan GRUB, fysisk release-EFI i QEMU, två godkända Arch-starter
+med riktig kärnuppdatering 7.2.7 → 7.2.9. Inga felande systemd-enheter.
+Felaktig UKI, misslyckad mkinitcpio-hook, full ESP och verklig pacman-avvisning
+bevarade aktiv fil. Syntetisk NVIDIA-pakettrigger gav ombyggnad/publicering;
+verklig NVIDIA-uppdatering är inte separat provad. Kopierings-/namnbytesfel
+provades separat med injicerade fel.
+
+Värdresultat: `artifacts/internal-layout/installed-result.json`, `install.log`,
+`rebuild.log`, `boot-before.json` och `firmware-before.txt`. Läs
+`docs/INTERNAL-SINGLE-UKI.md` för profil och rescue-återställning.
+Manuell publicerande ombyggnad:
+
+```sh
+sudo python3 /usr/local/lib/eutherboot-single/eutherboot-single.py rebuild
+```
+
+Enbart `mkinitcpio -P` bygger staging, inte publicering. Pacman-integrationen
+inväntar lyckat byggkommando innan publicering; mkinitcpio-efterhooks används
+inte, eftersom ett felprov visade att de kan köras trots byggfel.
+
+## Historik före interninstallationen
+
+Följande äldre instruktioner om kvarvarande GRUB och förbud mot intern
+installation beskriver tidigare läge och ersätts av avsnittet ovan.
+
 Uppdaterad 2026-10-11. **Fysiskt test godkänt enligt foto och användarens rapport:
 F4 → Esc → huvudmeny → befintlig bootloader → GRUB → Arch.**
 
@@ -11,6 +85,30 @@ Se `docs/HOST-COMPATIBILITY.md` för utrymmesstatus.
 
 
 ## Nu: separat USB för direktstart av installerat Arch
+
+### Återkomstkontroll 2026-10-11
+
+Efter användarens ”jag är tillbaka” verifierades live att `/proc/cmdline`
+innehåller `eutherboot_probe=usb-direct-normal-v1`, att `uname -r` är
+`7.2.9-arch1-1` och att `/` är `/dev/nvme0n1p2[/@]`, Btrfs med FSROOT `/@`.
+Kingston DataTraveler 3.0 är ansluten (28,9 GiB, en 1 GiB FAT-partition,
+omonterad vid kontrollen). Detta bekräftar normaltestets startkommandorad på
+den körande värden. Användaren svarade därefter ”allt funkar fint” på frågan
+om direktval och fungerande skrivbord/grafik. Fysisk normal direktstart är
+därmed bekräftad; reservstart är inte testad i denna kontroll. Git var rent.
+Kontrollen var enbart läsande; ingen bootkonfiguration eller USB ändrades.
+Leveransstatus och instruktioner nedan beskriver läget före återkomsten.
+
+Ny läsande installationskontroll samma dag: cirka 418,4 MiB ledigt på ESP,
+men installerarens budget för befintliga payloads är cirka 1,47 GiB ledigt,
+redan före LTS. `linux-lts` och `systemd-ukify` saknas fortfarande.
+Direktstartstestet är godkänt. Användaren förtydligade att GRUB ska tas bort
+helt och rescue-stickan ska vara återväg; flera interna reservgenerationer är
+inte målbilden. Den gamla installerarens budget är därför inte krav för den
+valda layouten. Se `docs/INTERNAL-SINGLE-UKI.md`: en normal UKI ger cirka
+713,4 MiB ledigt och 440,5 MiB under byte med lika stor ny UKI. En enkel
+uppdateringsprofil behöver implementeras och provas före migration.
+Ingen intern installation eller radering har gjorts.
 
 Användaren bekräftar att Euther Rescue 0.1.1 startar fysiskt och att Codex-
 inloggning fungerar från stickan. Rescue-stickan behålls intakt. En annan

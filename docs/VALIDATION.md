@@ -1,5 +1,59 @@
 # Validation · 2026-10-10 · Arch kernel updates and LoadFile2
 
+## Single UKI with external rescue · 2026-10-11
+
+`scripts/test-single-qemu.py` passed on a disposable 1 GiB FAT ESP and a
+Btrfs `/@` root, without network or physical disks. The production release
+EFI started installed Arch 7.2.7, a real pacman transaction upgraded linux
+to 7.2.9, and a second cold boot reached that kernel with working module
+loading and no failed systemd units. GRUB was removed by the tested installer.
+
+Real pacman pre-transaction refusal with a filled ESP preserved both the
+installed kernel package and the active UKI. Invalid PE input and a missing
+mkinitcpio build hook preserved the active file. A synthetic `nvidia-open`
+package exercised package-only rebuild/publication triggers; this is not a
+real NVIDIA driver update test. A valid UKI padded to the host payload size
+also passed publication. Separate injected copy and rename failures retained
+the active bytes and cleaned temporary copies (`tests/test_single_publish.py`).
+
+The initial mkinitcpio post-hook design failed the build-error oracle:
+mkinitcpio ran it despite a missing build hook. The final integration wraps
+the distribution's pacman build command and publishes only after successful
+process exit. The final run passed that same negative test. Test-fixture
+corrections included Python from the local package cache and explicit mounting
+of the cloud image's separate swap subvolume after its root snapshot.
+
+Evidence: `artifacts/single-qemu/result.json` and three serial boot logs.
+The base image hash remained unchanged. Host installation and the subsequent
+physical internal boot are separate gates; see `HANDOFF.md` for their status.
+
+## Host single-UKI installation · 2026-10-11
+
+The authorized migration completed: GRUB package and generated GRUB files were
+removed, normal/fallback standalone initramfs images were replaced by one UKI,
+and the production EutherBoot EFI replaced the existing fallback-path loader.
+The prior ESP and preset were copied to root and hash-verified before changes.
+The deployed rebuild wrapper built and published kernel 7.2.9 successfully;
+ESP UKI and EFI hashes matched their sources. ESP free space is 748,019,712 bytes.
+NVRAM/boot order remained byte-for-byte identical in `efibootmgr -v` output.
+No reboot was performed. Physical internal boot remains pending.
+
+Evidence: `artifacts/internal-layout/installed-result.json`, `install.log` and
+`rebuild.log`; rescue/rollback instructions are in `INTERNAL-SINGLE-UKI.md`.
+
+## Physical host return check · 2026-10-11
+
+After the user returned, live read-only checks found
+`eutherboot_probe=usb-direct-normal-v1` in `/proc/cmdline`, kernel
+`7.2.9-arch1-1`, and root `/dev/nvme0n1p2[/@]` with Btrfs FSROOT `/@`.
+The Kingston DataTraveler 3.0 was connected with its 1 GiB FAT partition
+unmounted. The running host therefore carries the normal direct-test command
+line. The user then replied “allt funkar fint” to the question about the direct
+entry and working desktop/graphics, confirming physical normal direct boot.
+This check does not validate the fallback entry or an internal
+installation. No boot files, USB contents or EFI variables were changed.
+The sections below retain their original virtual-test scope.
+
 Host: Rust 1.99.0, QEMU 11.1.2 TCG/q35, ordinary OVMF, x86_64 UEFI target.
 This is virtual-development evidence: Linux reaches a generated diagnostic PID 1,
 including a locally signed UKI under an enforced OVMF owner-key policy.
