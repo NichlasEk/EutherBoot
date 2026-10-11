@@ -118,7 +118,7 @@ fn session(allow_timeout: bool) -> Option<Status> {
         if seconds == 0 || !allow_timeout {
             String::from("No automatic boot. Select an entry and press Enter.")
         } else {
-            format!("Auto-start after {seconds}s. Any key cancels.")
+            format!("Starting in {seconds}s. Any key cancels.")
         }
     });
     let mut text = render(
@@ -157,6 +157,7 @@ fn session(allow_timeout: bool) -> Option<Status> {
         };
         let mut activate = false;
         let mut redraw = false;
+        let mut countdown_changed = None;
         if let Some(key) = key {
             // Input wins if both keyboard and timer are ready in this poll.
             if timer.take().is_some() {
@@ -165,11 +166,11 @@ fn session(allow_timeout: bool) -> Option<Status> {
                 redraw = true;
             }
             match key {
-                Key::Special(ScanCode::UP) => {
+                Key::Special(ScanCode::UP | ScanCode::LEFT) => {
                     menu.previous(labels.len());
                     redraw = true;
                 }
-                Key::Special(ScanCode::DOWN) => {
+                Key::Special(ScanCode::DOWN | ScanCode::RIGHT) => {
                     menu.next(labels.len());
                     redraw = true;
                 }
@@ -207,7 +208,20 @@ fn session(allow_timeout: bool) -> Option<Status> {
                     trace("TIMEOUT_FIRED");
                     activate = true;
                 }
-                Ok(false) => {}
+                Ok(false) => match t.countdown() {
+                    Ok(Some(remaining)) => {
+                        notice = format!("Starting in {remaining}s. Any key cancels.");
+                        countdown_changed = Some(remaining);
+                        redraw = true;
+                    }
+                    Ok(None) => {}
+                    Err(s) => {
+                        timer = None;
+                        notice = format!("Timer error: {s:?}. Automatic boot disabled.");
+                        trace("TIMEOUT_ERROR");
+                        redraw = true;
+                    }
+                },
                 Err(s) => {
                     timer = None;
                     notice = format!("Timer error: {s:?}. Automatic boot disabled.");
@@ -260,6 +274,9 @@ fn session(allow_timeout: bool) -> Option<Status> {
         } else if redraw {
             trace(&format!("SELECT {}", menu.selected));
             text = render(&labels, &menu, &notice, text);
+            if let Some(remaining) = countdown_changed {
+                trace(&format!("COUNTDOWN {remaining}"));
+            }
         } else {
             input::idle(timer.as_ref());
         }

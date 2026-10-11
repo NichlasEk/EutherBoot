@@ -500,3 +500,62 @@ This is not evidence that the complete generation store fits the inventoried
 1 GiB host ESP, nor that NVIDIA hardware or the physical firmware has passed.
 The large-initramfs capacity case is synthetic, and the guest uses virtio/Btrfs
 modules instead of NVIDIA. Hardware testing remains a separate gate.
+
+## Physical USB chainload — 0.1.1, 2026-10-11
+
+User-supplied photo shows EutherBoot 0.1.1 discovery with two firmware
+filesystems, two verified ESPs, one application at `\EFI\BOOT\BOOTX64.EFI`
+and one skipped candidate. The user reports Escape returned to the graphical
+menu, selecting the existing loader opened GRUB, and choosing Arch reached
+the running desktop. The subsequent host inventory reports 7.2.9-arch1-1,
+matching the installed linux package. Evidence: `artifacts/physical-0.1.1/`.
+
+This establishes the configured physical chainload path on this machine. It
+does not establish the precise cause of the 0.1.0 failure, direct discovery
+launch, physical editor/save recovery, Secure Boot or managed UKI installation.
+The unchanged internal path without USB has no separate reported control test.
+
+## System Regis main-menu revision — 2026-10-11
+
+The local development renderer embeds antialiased Liberation-derived glyphs
+(OFL license included), rounded gradient cards, supersampled geometry and a
+three-crown emblem. Left/right joins existing up/down navigation. Entry-name
+icon hints are decorative and do not change the configured boot target.
+
+Validation on the final renderer: 29 boot-core tests, configuration validation
+and release-profile UEFI build passed. Eight QEMU cases passed: sample
+start/return at 1024×768 and 640×480, 16-entry pagination at 640×480 and
+1920×1080, missing target, aborted child, timeout and cancellation. Sample
+cases also exercise left/right, text mode and repeated child start/return.
+The discovery multiple-volume case passed at 640×480 during UI development
+with the complete virtual GPT/FAT disk unchanged. Main-menu screenshots were
+visually inspected; manifests and captures remain in ignored artifacts.
+
+Evidence: `artifacts/regis-ui-result.json`, `artifacts/qemu-*/first-light.png`,
+`artifacts/qemu-*-return-many/` and `artifacts/discovery-*`.
+This is a local QEMU-debug development binary, still labeled 0.1.1, not a new
+physical USB delivery. F4 and editor retain their text UI. No physical test of
+the revised graphics or release deployment has occurred.
+
+## Approved emblem and live countdown — 2026-10-11
+
+The approved transparent steel-sword/gold-crown artwork is now embedded as a
+bounded 144×144 RGBA asset; the compact layout renders it at 96×96. The original
+PNG and conversion script are retained in the source tree. The Arch installation
+example now specifies 10 seconds; explicit zero and omitted timeout retain their
+existing wait semantics, and no saved or physical USB configuration was modified.
+
+The final build passed 29 core tests and six QEMU cases recorded in
+`artifacts/regis-emblem-countdown-result.json`: zero-timeout sample start/return
+at 1024×768 and 640×480, 10-second countdown, 3-second countdown at 640×480,
+cancellation after a displayed tick, and timeout to a missing target. The tests
+observe changed framebuffer pixels after a completed countdown redraw, bound
+the actual boot time, and check that cancellation stops further ticks and that
+return/failure does not rearm automatic boot.
+
+The first countdown capture exposed a test synchronization race: the trace was
+emitted before GOP redraw completed. The completion trace now follows rendering;
+the assertion still requires an actual framebuffer change. Screenshots of the
+final countdown and embedded emblem were visually inspected at both resolutions.
+The independent deadline remains authoritative if display ticks are delayed.
+No physical UI or autoboot test, USB write, or internal installation occurred.

@@ -24,7 +24,7 @@ def menu(v,name):
         v.screen(name)
         with Image.open(v.base/f'{name}.ppm') as frame:
             colors={rgb:n for n,rgb in frame.getcolors(frame.width*frame.height)}
-            if colors.get((8,21,35),0)>frame.width*frame.height//2 and colors.get((184,161,105),0)>1500 and colors.get((218,225,229),0)>1000:
+            if colors.get((9,15,24),0)>frame.width*frame.height//2 and colors.get((208,184,125),0)>500 and colors.get((238,229,205),0)>100:
                 frame.save(v.base/f'{name}.png');return
         if v.proc.poll() is not None:raise RuntimeError('VM exited before menu')
         time.sleep(.2)

@@ -59,7 +59,13 @@ Graphics use a bounded, fallibly allocated software buffer and GOP BLT, avoiding
 pixel-format/stride assumptions. The current firmware mode is preserved; supported
 dimensions are 640×480 through 3840×2160. Failed GOP/BLT/allocation or unsupported
 dimensions fall back to firmware text output. F2 selects text explicitly, and `theme = "text"` requests it persistently. The
-geometric emblem is original code, and font8x8 supplies bitmap glyphs.
+main menu uses an user-approved embedded steel-sword/three-crown RGBA emblem and supersampled lines
+and rounded panels. Embedded Liberation-derived ASCII masks provide antialiased
+body/serif text; their OFL license and generator are included. Integer scaling
+keeps the logical canvas at least 640×480, capped at 3×. Configured targets use
+paginated icon cards; the final two built-in actions remain below them. Up/down
+and left/right navigate the same ordered selection. Icons are presentation hints
+from entry names, not detected operating-system identities.
 GOP uses a short GET_PROTOCOL borrow, not Exclusive (which can disconnect the
 firmware graphics-console driver). No console calls, driver removal or exit from
 boot services happen while that unsafe borrow is alive.
@@ -69,7 +75,11 @@ not a count of polling iterations. It is armed after the first frame. Input is
 checked before expiry, so a queued key wins when both are ready. Any key closes
 the timer. Expiry closes it before starting the default, and it is never rearmed.
 Timer creation/check failures disable automatic boot. A saved or recovered configuration is reloaded without rearming automatic boot
-in that session. The initial timeout is shown, but no live numeric countdown exists. Console failures remain
+in that session. A separate one-second periodic event updates the visible remaining-seconds
+notice. The independent one-shot deadline controls boot; display ticks cannot
+delay or trigger it. Both events close on cancellation, errors and child launch.
+The countdown is a display estimate if firmware stalls long enough to coalesce
+periodic ticks; the deadline remains authoritative. Console failures remain
 best-effort; simultaneous loss of both GOP and text output is unresolved.
 
 ## EFI image lifecycle

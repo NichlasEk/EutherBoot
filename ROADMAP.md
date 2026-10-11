@@ -8,7 +8,7 @@
 | D · Configuration | Demonstrated in QEMU | Shared Rust TOML parser, own-volume config reads, optional GPT partition selectors, strict validation, default and cancellable one-shot timeout |
 | E · Editor | Demonstrated in QEMU | Keyboard drafts, discovery import, partition selector editing, preview, confirmed save, backup and explicit recovery on GPT/FAT |
 | F · Compatibility | Started in QEMU | Multiple GPT ESPs, Linux EFI-stub with LoadFile2 initrd/command line and UKI reach diagnostic Linux PID 1; virtual owner-key Secure Boot tested; installed Arch reaches systemd/Btrfs root across two cold boots; broader distributions and firmware remain |
-| G · Hardware | Not authorized or tested | Dedicated machine, separately approved installation, known-good boot path and rollback |
+| G · Hardware | USB chainload demonstrated on one physical machine | 0.1.1 discovery photo and user-confirmed main menu → GRUB → Arch; managed installation and broader hardware remain untested |
 
 Read-only discovery is demonstrated: F4, stable partition GUIDs, full device paths,
 exact self-copy exclusion, duplicate-GUID rejection and no automatic defaults.

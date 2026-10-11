@@ -17,7 +17,9 @@ Linux EFI-stub and unsigned UKI boots reach a generated minimal initramfs PID 1 
 QEMU, including a second ESP. Disposable owner-key Secure Boot tests also cover
 EFI authentication and a signed diagnostic UKI. The official installed Arch basic
 image also boots through EutherBoot with its own initramfs, systemd and Btrfs root;
-two cold boots verify a persistent guest write. Physical hardware remains untested.
+two cold boots verify a persistent guest write. EutherBoot 0.1.1 has also booted on physical hardware: discovery displayed two
+verified ESPs, and the user confirmed returning to the main menu and chainloading
+the existing GRUB into Arch Linux. Managed installation remains untested physically.
 
 ## Installation tooling
 
@@ -40,6 +42,15 @@ The larger Arch matrix requires the prepared official image, the release package
 (including its native validator), the normal EFI test artifacts,
 Secure Boot test tools and guest package downloads. Evidence is written under
 `artifacts/arch-release/`; only a completed `result.json` establishes a passing run.
+
+## Main-menu appearance
+
+The System Regis graphical menu uses navy panels, gold selection, a steel-sword/three-crown
+emblem and embedded antialiased serif/body text. Configured entries appear as
+paginated icon cards, with configuration and firmware-return actions below.
+Entry-name icons are visual hints, not OS detection. F4 and the editor currently
+retain text interfaces. Glyph attribution and regeneration details are in
+[the font asset notes](crates/uefi-app/assets/fonts/README.md).
 
 ## Build and run
 
@@ -128,6 +139,12 @@ Validation can accept a well-formed GUID for an absent disk; availability is
 checked at launch (and before arming a qualified default's timer). This allows
 editing entries for temporarily disconnected media. Configuration and backups
 are still written **only on EutherBoot's own volume**, never to the selected ESP.
+
+The supplied Arch installation configuration uses a **10-second timeout**.
+The disposable test configuration explicitly uses zero, and omission still means
+zero for compatibility. Existing saved configurations are not rewritten. The menu
+shows a live seconds countdown; any key cancels it. In F3, start a draft with E,
+set seconds with T, then S and Y to save. Zero waits indefinitely.
 
 `default` must match a unique entry ID. `timeout` is 0..3600 seconds; zero or
 omission means wait indefinitely. Appearance is `system-regis` (the default) or `text`. A positive timeout starts the default once, after the initial
@@ -337,7 +354,7 @@ is the Linux integrity boundary tested here.
 
 ## Controls
 
-- Up/Down: select, with wrapping and automatic page changes.
+- Up/Down or Left/Right: select, with wrapping and automatic page changes.
 - Enter: start the selected EFI entry, inspect configuration or return to firmware.
 - F2: use firmware text output for the current menu session.
 - F3: open the configuration editor in read-only mode.
@@ -460,8 +477,8 @@ python3 scripts/editor-qemu.py --case after-backup
 ```
 
 See [architecture](ARCHITECTURE.md), [roadmap](ROADMAP.md) and
-[validation evidence](docs/VALIDATION.md). This remains a virtual-development
-prototype; physical installation requires separate approval and rollback planning.
+[validation evidence](docs/VALIDATION.md). This remains a prototype with one confirmed physical USB-to-GRUB-to-Arch boot;
+physical installation requires separate approval and rollback planning.
 
 Fault-injection tests use the separate `EutherBoot-faults.efi` artifact. Its
 `test-faults` feature is excluded from the normal binary. Test scripts create

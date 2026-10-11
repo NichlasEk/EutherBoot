@@ -87,11 +87,12 @@ with tempfile.TemporaryDirectory(prefix='eutherboot-') as tmp:
                         assert ppm.readline().strip() == b'255'
                         pixels=ppm.read()
                     assert len(pixels) == a.width*a.height*3
-                    assert pixels.count(bytes((8,21,35))) > a.width*a.height//2, 'Missing navy canvas'
-                    assert pixels.count(bytes((184,161,105))) > 500, 'Missing emblem/borders'
-                    assert pixels.count(bytes((218,225,229))) > 100, 'Missing title/menu text'
+                    assert pixels.count(bytes((9,15,24))) > a.width*a.height//2, 'Missing navy canvas'
+                    assert pixels.count(bytes((208,184,125))) > 500, 'Missing emblem/borders'
+                    assert pixels.count(bytes((238,229,205))) > 100, 'Missing title/menu text'
                     assert 'CHILD_STARTED' not in log.read_text(), 'Unexpected automatic boot'
                     key('up','SELECT 2'); key('down','SELECT 0')
+                    key('left','SELECT 2'); key('right','SELECT 0')
                     def chainload(attempt, text_mode=False):
                         before=len(log.read_text())
                         serial_before=(out/'serial.log').stat().st_size
@@ -99,7 +100,7 @@ with tempfile.TemporaryDirectory(prefix='eutherboot-') as tmp:
                             key('ret','CHILD_READY')
                             screen(f'child-{attempt}')
                             child_pixels=(out/f'child-{attempt}.ppm').read_bytes().split(b'\n',3)[3]
-                            assert child_pixels.count(bytes((8,21,35))) < a.width*a.height//2
+                            assert child_pixels.count(bytes((9,15,24))) < a.width*a.height//2
                             assert 'EUTHERBOOT EFI TEST CHILD' in (out/'serial.log').read_text()
                             key('ret' if a.scenario == 'return' else 'd' if a.scenario == 'exit-data' else 'esc', 'MENU_RESUMED')
                         else:
@@ -129,7 +130,7 @@ with tempfile.TemporaryDirectory(prefix='eutherboot-') as tmp:
                             assert b'EUTHERBOOT | SYSTEM REGIS' in serial, 'Missing restored text menu'
                             assert b'EFI test application' in serial
                             assert 'TEXT_READY' in fresh
-                            assert resumed.count(bytes((8,21,35))) < a.width*a.height//2
+                            assert resumed.count(bytes((9,15,24))) < a.width*a.height//2
                         else:
                             # Child clears the display: verify the actual menu is redrawn,
                             # not just that a trace says it resumed. Notice/footer may differ.
@@ -138,7 +139,7 @@ with tempfile.TemporaryDirectory(prefix='eutherboot-') as tmp:
                     key('down','SELECT 1'); key('up','SELECT 0'); chainload(2)
                     key('f2','TEXT_READY'); screen('text-fallback')
                     fallback=(out/'text-fallback.ppm').read_bytes().split(b'\n',3)[3]
-                    assert fallback.count(bytes((8,21,35))) < a.width*a.height//2, 'Graphical canvas remained after F2'
+                    assert fallback.count(bytes((9,15,24))) < a.width*a.height//2, 'Graphical canvas remained after F2'
                     chainload(3, text_mode=True)
                     key('down','SELECT 1')
                     key('down','SELECT 2'); key('ret','EXIT_FIRMWARE')

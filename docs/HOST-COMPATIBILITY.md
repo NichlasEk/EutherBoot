@@ -75,7 +75,7 @@ media and chainload the established loader. That tests firmware/menu integration
 without requiring the managed UKI layout to fit the existing ESP. Preparing media
 or writing a host ESP is a separate explicit action with a concrete destination
 and rollback plan. The first USB delivery is now written and readback-verified;
-physical boot remains untested. See `../HANDOFF.md` for the test and rollback steps.
+physical USB → existing GRUB → Arch boot is now confirmed by the user. See `../HANDOFF.md` for the test and rollback steps.
 
 Before interpreting any hardware-probe failure, establish a cold-boot baseline
 through the unchanged GRUB path: the inventoried running and installed kernel
@@ -108,3 +108,69 @@ explicitly identified disposable destination and use of the firmware's one-time
 boot selector. Boot order and installed loaders need not be changed for that test.
 The currently prepared image is unsigned, matching the inventoried disabled
 Secure Boot state; do not change firmware trust settings merely to run it.
+
+## Physical boot and refreshed inventory — 2026-10-11
+
+The user confirmed EutherBoot 0.1.1 → F4 → Escape → main menu → existing
+loader → GRUB → Arch login. The photo shows two firmware filesystems, two
+verified ESPs, one application and one skipped candidate. Direct launch from
+the discovery browser was not tested. A separate boot without USB remains open.
+
+Read-only inventory after this boot found:
+
+| Item | Current observation |
+| --- | --- |
+| Running / installed kernel | 7.2.9-arch1-1 / linux 7.2.9.arch1-1 |
+| ESP capacity / free | 1,071,624,192 / 438,767,616 bytes (418.4 MiB free) |
+| Current kernel | 17,236,480 bytes |
+| Normal initramfs | 268,792,835 bytes (256.3 MiB) |
+| Fallback initramfs | 316,676,253 bytes (302.0 MiB) |
+| Intel microcode image | 15,265,792 bytes |
+| GRUB directory | Approximately 15 MiB |
+| Old module directories on root | 174,166,016 allocated bytes (166.1 MiB), 110 files/symlinks; no pacman ownership found |
+
+No old kernel images were found on the ESP. The fallback image is a current
+recovery image, not an old kernel. Old module remnants are on the Btrfs root;
+removing them would not increase ESP free space. Lack of package ownership alone
+does not establish that every remnant is safe to remove. No files were deleted.
+
+`lsinitcpio -a` identifies the normal image as kernel 7.2.9-arch1-1, with
+166.14 MiB early CPIO plus a 90.2 MiB zstd payload. It includes explicit NVIDIA
+modules and many other graphics modules. The current hook order places `kms`
+before `autodetect`; image-size optimization deserves a separate validated
+experiment, not deletion of the working fallback. LTS and systemd-ukify remain
+absent; the managed-generation capacity gate remains unresolved.
+
+Evidence is local and ignored under `artifacts/physical-0.1.1/`: discovery photo,
+`host-audit.json` and per-file ownership results in `old-modules.json`. The audit
+script's generic unverified list is not aware of the separately reported physical
+boot; its package, mount and size observations are the refreshed inventory.
+
+## Isolated initramfs size experiment — 2026-10-11
+
+Two unprivileged builds used copied configuration, explicit kernel 7.2.9-arch1-1,
+`mkinitcpio --nopost`, and output only under ignored `artifacts/initramfs-size/`.
+No preset was invoked and no installed configuration or boot image was changed.
+
+| Variant | Bytes | MiB |
+| --- | --- | --- |
+| Installed normal image | 268,792,835 | 256.34 |
+| Move autodetect before kms | 217,429,499 | 207.36 |
+| Omit kms, retain all four explicit NVIDIA modules | 105,433,302 | 100.55 |
+
+The machine uses an RTX 4090 with the NVIDIA driver. The installed hook order
+collects broad DRM drivers before hardware filtering. Moving autodetect earlier
+reduces that collection but still includes nouveau and its firmware, despite
+the installed nouveau blacklist. Four nouveau GSP firmware files alone account
+for about 100.4 MiB. Early CPIO is not just CPU microcode: the installed
+mkinitcpio moves already-compressed modules/firmware there to avoid recompression.
+
+The smallest candidate retains explicit nvidia, nvidia-modeset, nvidia-uvm and
+nvidia-drm modules, NVIDIA GSP firmware, NVMe, Btrfs content and Intel microcode.
+Both builds succeeded; listing checks establish inclusion, not physical boot
+compatibility. The candidate has not been installed or booted. Replacing only
+the normal image would save about 155.8 MiB, leaving about 574.2 MiB free; the
+current fallback would remain available. This alone does not establish capacity
+for managed UKI/LTS generations. SHA-256 comparison of all files under `/boot`
+confirmed no changes. Logs, image lists, configurations and `result.json` are
+retained with the experiment.

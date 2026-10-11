@@ -13,7 +13,7 @@ ERRORS = {
     'oversize': 'Config read: BAD_BUFFER_SIZE',
     'self': 'Configuration points to EutherBoot itself',
 }
-CASES = ('sample', 'default', 'timeout', 'cancel', 'timeout-missing', 'many', *ERRORS)
+CASES = ('sample', 'default', 'countdown', 'timeout', 'cancel', 'timeout-missing', 'many', *ERRORS)
 
 
 def prepare(esp, root, case):
@@ -52,7 +52,7 @@ def prepare(esp, root, case):
         shutil.copy2(root/'artifacts/TestChild.efi', esp/'EFI/Alternate/Chosen.efi')
     count = 16 if case == 'many' else 2
     default = 'entry0' if case == 'many' else 'entry1'
-    timeout = 3 if case in ('timeout', 'cancel', 'timeout-missing') else 0
+    timeout = 10 if case == 'countdown' else 3 if case in ('timeout', 'cancel', 'timeout-missing') else 0
     source = f'[boot]\ndefault="{default}"\ntimeout={timeout}\n'
     for i in range(count):
         name = f'Configured entry {i+1}'
@@ -82,7 +82,7 @@ def run(case, out, log, screen, key, wait_marker, width, height, menu_ready_at):
     assert 'CONFIG_OK' in log.read_text()
     assert f'MENU_READY selected={0 if case == "many" else 1}' in log.read_text()
     first = snapshot('configured-menu')
-    assert first.count(bytes((8, 21, 35))) > width*height//2
+    assert first.count(bytes((9, 15, 24))) > width*height//2
     if case == 'many':
         for index in range(1,16):
             key('down', f'SELECT {index}')
@@ -98,14 +98,24 @@ def run(case, out, log, screen, key, wait_marker, width, height, menu_ready_at):
         key('ret', 'EXIT_FIRMWARE')
         return
     if case == 'cancel':
+        wait_marker('COUNTDOWN 2', 0)
         key('x', 'TIMEOUT_CANCELLED')  # Even an otherwise unhandled key cancels.
+        ticks = log.read_text().count('COUNTDOWN ')
         time.sleep(3.5)
+        assert log.read_text().count('COUNTDOWN ') == ticks, 'Countdown continued after cancellation'
         assert 'CHAINLOAD_REQUEST' not in log.read_text() and 'TIMEOUT_FIRED' not in log.read_text()
         key('ret', 'CHILD_READY')
-    elif case in ('timeout', 'timeout-missing'):
+    elif case in ('countdown', 'timeout', 'timeout-missing'):
+        wait_marker('COUNTDOWN 9' if case == 'countdown' else 'COUNTDOWN 2', 0)
+        tick = snapshot('countdown-tick')
+        assert tick != first, 'Countdown did not change framebuffer'
+        if case == 'countdown':
+            wait_marker('COUNTDOWN 5', 0)
+            snapshot('countdown-five')
         wait_marker('TIMEOUT_FIRED', 0)
         elapsed = time.monotonic() - menu_ready_at
-        assert 2.5 <= elapsed <= 10, f'3s timeout fired at {elapsed:.2f}s'
+        expected = 10 if case == 'countdown' else 3
+        assert expected-.5 <= elapsed <= expected+7, f'{expected}s timeout fired at {elapsed:.2f}s'
         if case == 'timeout-missing':
             wait_marker('MENU_RESUMED', 0)
             assert 'CHAINLOAD_ERROR Load(NOT_FOUND)' in log.read_text()
@@ -127,7 +137,7 @@ def run(case, out, log, screen, key, wait_marker, width, height, menu_ready_at):
     assert 'CHILD_CONTEXT_OK' in current and 'CHAINLOAD_RETURN_SUCCESS' in current
     returned = snapshot('configured-return')
     assert first[:(height-110)*width*3] == returned[:(height-110)*width*3]
-    if case == 'timeout':
+    if case in ('countdown', 'timeout'):
         time.sleep(3.5)
         assert log.read_text().count('TIMEOUT_FIRED') == 1
         assert log.read_text().count('CHAINLOAD_REQUEST') == 1

@@ -1,13 +1,19 @@
-# EutherBoot – handoff inför omstart och fysiskt test av 0.1.1
+# EutherBoot – handoff efter lyckat fysiskt test av 0.1.1
 
-Uppdaterad 2026-10-11. **USB 0.1.1 är levererad och återläst. Nästa steg är
-användarens fysiska F4-test, inte ett nytt bygge eller en ny skrivning.**
+Uppdaterad 2026-10-11. **Fysiskt test godkänt enligt foto och användarens rapport:
+F4 → Esc → huvudmeny → befintlig bootloader → GRUB → Arch.**
+
+Ny inventering: körande och installerad kärna är 7.2.9-arch1-1. På `/boot`
+finns en aktuell kärna, normal- och fallback-initramfs; inga gamla kärnavbilder
+hittades. Ledigt: 438 767 616 byte (418,4 MiB). Gamla modulrester om cirka
+166,1 MiB finns på rotpartitionen, inte ESP:n. Inget har raderats.
+Se `docs/HOST-COMPATIBILITY.md` för utrymmesstatus.
 
 ## Börja här efter omstart
 
-1. Arbeta i `/run/media/nichlas/Kingston1TB/EutherBoot` och läs denna fil.
-2. Samla användarens foto/resultat: syntes **0.1.1**, vad visade **F4**, kom
-   **Existing boot loader** vidare till GRUB och sedan Arch?
+1. Det fysiska starttestet är genomfört; upprepa inte USB-leveransen. Arbeta i `/run/media/nichlas/Kingston1TB/EutherBoot` och läs denna fil.
+2. Foto och rapport finns sammanfattade nedan; evidens finns i
+   `artifacts/physical-0.1.1/`. Vanlig intern start utan USB är ännu inte separat rapporterad.
 3. Läs `artifacts/host-probe-0.1.1/usb-delivery.json` och `usb-result.json`.
    Kontrollera `git status --short --branch` och `git log -3 --oneline`.
 4. Om stickan behöver läsas: identifiera enhet, PARTUUID, storlek och mount på
@@ -71,9 +77,10 @@ Verifierat lokalt:
 - Fysiska USB-filer återlästa enligt leveransen ovan.
 
 Clippy kördes inte: komponenten saknas i den lokala verktygskedjan.
-QEMU-testprogrammet är inte GRUB; fysisk GRUB-/Arch-kompatibilitet återstår.
+QEMU-testprogrammet är inte GRUB. Användaren har nu separat bekräftat fysisk
+GRUB-start och Arch-inloggning via EutherBoot 0.1.1.
 
-## Användarens nästa test
+## Genomfört fysiskt test (ursprungliga instruktioner)
 
 1. Spara arbetet och öppna firmwarets tillfälliga bootmeny.
 2. Välj **General UDisk**, kontrollera **0.1.1** nere till höger.
@@ -89,11 +96,11 @@ Secure Boot-nycklar. Om Arch även misslyckas via vanlig GRUB, undersök det sep
 
 | Kontrollpunkt för 0.1.1 | Status |
 | --- | --- |
-| Fysisk meny visar 0.1.1 | Väntar på användarens test |
-| F4: antal filsystem/ESP och identifieringsfel | Väntar på foto |
-| F4: intern GRUB-fil syns | Ej verifierat |
-| Existing boot loader → vanlig GRUB | Ej verifierat |
-| GRUB → Arch/skrivbord | Ej verifierat |
+| Fysisk meny visar 0.1.1 | Foto visar 0.1.1 i F4 |
+| F4: antal filsystem/ESP och identifieringsfel | Foto: 2 filsystem, 2 verifierade ESP, 1 app, 1 överhoppad; inget identifieringsfel visas |
+| F4: intern GRUB-fil syns | Foto visar ESP och `\EFI\BOOT\BOOTX64.EFI`; direktstart från F4 ej testad |
+| Existing boot loader → vanlig GRUB | Bekräftat av användaren efter Esc från F4 |
+| GRUB → Arch/skrivbord | Bekräftat av användaren; aktuell uname: 7.2.9-arch1-1 |
 | Vanlig intern start utan USB | Inget separat kontrollresultat rapporterat |
 
 ## Evidens och återgångsfiler
@@ -123,3 +130,24 @@ Tidigare inventering visade otillräckligt ESP-utrymme för hanterade UKI-genera
 samt saknade LTS/ukify-förutsättningar. Den virtuella Arch-matrisen använde en
 2 GiB ESP och verifierar inte värdens NVIDIA-drivrutin eller fysiska firmware.
 Full installation kräver separat lagringsplan och uttrycklig beställning.
+
+## Pågående visuellt arbete efter det fysiska testet
+
+Den lokala huvudmenyn har nu mörkblå/guld-palett, tre kronor, inbäddade
+kantutjämnade typsnitt, ikonkort, rundade ramar och vänster/höger-navigation.
+Se `PLAN.md` för riktningen från EutherFPScan. F4/editor använder fortsatt
+textvyer. UI-bygget har fortfarande versionsnummer 0.1.1 och är ett lokalt
+utvecklingsbygge: det är inte den hashidentifierade USB-leveransen ovan.
+Ingen ny USB-skrivning, intern installation eller fysisk UI-verifiering har gjorts.
+Artefakter: `artifacts/regis-ui-result.json` och `artifacts/qemu-*/`.
+
+### Godkänt emblem och autoboot
+
+Det godkända stålsvärdet med tre guldkronor är nu inbäddat som RGBA-bild i
+UI-bygget. Den grafiska menyn visar en sekundnedräkning vid positiv timeout.
+Arch-installationens mall använder 10 sekunder; testkonfigurationen och den
+redan levererade USB-konfigurationen har fortsatt explicit 0. Befintliga
+konfigurationer skrivs inte om. F3/E/T/S/Y ändrar och sparar timeout.
+Den separata starttimern förblir styrande; en tangent avbryter båda timers.
+Ingen ny fysisk leverans eller fysisk test av dessa ändringar har gjorts.
+Se `artifacts/regis-emblem-countdown-result.json` för aktuell QEMU-status.
