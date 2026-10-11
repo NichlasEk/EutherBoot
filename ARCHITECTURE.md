@@ -294,14 +294,20 @@ a corrupt staging readback and a stale source to verify original preservation.
 
 F4 invokes a separate text browser, cancelling the menu timer through the existing
 any-key rule. Discovery starts only on request or R rescan. Enumerate firmware
-SimpleFileSystem handles; consult PartitionInfo for GPT ESP type, nonzero unique
-partition GUID, and absence of the legacy-BIOS attribute. Do not infer ESP status
-from FAT alone, partition position, a filename, or the current boot source.
-Missing PartitionInfo is an unverifiable identity, not a verified non-ESP: resolve
-stops with an explicit firmware diagnostic, and discovery marks the scan incomplete.
-This also prevents selecting a known match while another unverified handle could
-have the same GUID. The `test-faults` build can simulate this using the read-only
-`volume-fault` marker (`missing-partition-info`) on the manager volume.
+SimpleFileSystem handles; consult PartitionInfo for GPT ESP type and nonzero unique
+partition GUID. If firmware omits PartitionInfo, match the hard-drive device-path
+node to its exact parent BlockIO device. Read the primary GPT header and entry
+array, verify both CRC32 values, bounds, ESP type, unique GUID and exact start/size.
+The fallback reads at most 1 MiB of entries per identity and supports 512–4096-byte
+logical blocks with the firmware's buffer alignment. Corrupt, ambiguous or
+unavailable metadata remains an error; no disk repair is attempted. Legacy BIOS
+attribute bit 2 is ignored as required by UEFI; the no-BlockIO bit is rejected.
+Do not infer ESP status from FAT alone, a filename or partition position.
+F4 displays firmware filesystem and verified ESP counts plus the first identity
+error. Firmware that does not expose the disk at all still needs separate diagnosis;
+this change does not connect controllers or load firmware storage drivers.
+The `test-faults` build can simulate missing PartitionInfo on all volumes using
+the read-only `volume-fault` marker (`missing-partition-info`) on the manager volume.
 Duplicate GUIDs exclude every matching handle, even if their paths differ.
 Volumes sort by full GUID; candidates sort by volume then case-insensitive path.
 Each candidate retains its specific volume index/handle and exact path. The same
@@ -310,7 +316,8 @@ path on two different ESPs remains two distinct choices.
 Short synchronous GET_PROTOCOL borrows avoid disconnecting filesystem drivers.
 All filesystem opens use FileMode::Read. No firmware variables are read or written
 by this feature, and no ConnectController, partition writes, driver loading or
-filesystem repair is attempted. FAT/partition enumeration is delegated to firmware.
+filesystem repair is attempted. FAT/filesystem enumeration is delegated to firmware;
+the GPT fallback only reads already exposed whole-disk BlockIO handles.
 A full device-path snapshot accompanies each GUID. At explicit Y launch, reread
 the selected handle's identity/path, reclassify the file and exclude exact self
 copies again; then drop every protocol/file borrow before calling the shared

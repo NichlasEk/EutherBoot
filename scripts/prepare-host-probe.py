@@ -8,11 +8,12 @@ from qemu_test import VM
 import virtual_disk
 ROOT=Path(__file__).resolve().parent.parent
 parser=argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--output',type=Path,default=ROOT/'artifacts/host-probe')
 parser.add_argument('--target-guid',required=True,help='Existing loader ESP PARTUUID; embedded in local image only')
 parser.add_argument('--target-path',default=r'\EFI\BOOT\BOOTX64.EFI')
 args=parser.parse_args()
 assert str(uuid.UUID(args.target_guid))==args.target_guid and uuid.UUID(args.target_guid).int
-OUT=ROOT/'artifacts/host-probe';OUT.mkdir(exist_ok=True)
+OUT=args.output.resolve();OUT.mkdir(parents=True,exist_ok=True)
 (OUT/'usb-result.json').unlink(missing_ok=True)
 def sha(p):
     with p.open('rb') as f:return hashlib.file_digest(f,'sha256').hexdigest()

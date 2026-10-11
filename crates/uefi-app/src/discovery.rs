@@ -41,6 +41,8 @@ struct Scan {
     visited: usize,
     skipped: usize,
     incomplete: bool,
+    first_error: Option<Status>,
+    filesystem_count: usize,
     own: Vec<u8>,
     read_budget: usize,
 }
@@ -118,6 +120,8 @@ impl Scan {
             visited: 0,
             skipped: 0,
             incomplete: false,
+            first_error: None,
+            filesystem_count: 0,
             own,
             read_budget: 64 * 1024 * 1024,
         };
@@ -125,6 +129,7 @@ impl Scan {
         if handles.len() > MAX_VOLUMES {
             return Err(Status::OUT_OF_RESOURCES);
         }
+        scan.filesystem_count = handles.len();
         for handle in handles {
             match identity(handle) {
                 Ok(id) => {
@@ -142,6 +147,7 @@ impl Scan {
                 Err(Status::UNSUPPORTED) => scan.skipped += 1,
                 Err(s) => {
                     scan.incomplete = true;
+                    scan.first_error.get_or_insert(s);
                     crate::trace(&format!("DISCOVERY_VOLUME_ERROR {s:?}"));
                 }
             }
@@ -213,7 +219,10 @@ impl Scan {
         system::with_stdout(|out| {
             let _ = out.clear();
         });
-        uefi::println!("EUTHERBOOT | DISCOVER EFI APPLICATIONS\n");
+        uefi::println!(
+            "EUTHERBOOT {} | DISCOVER EFI APPLICATIONS\n",
+            env!("CARGO_PKG_VERSION")
+        );
         uefi::println!(
             "{} GPT ESPs, {} applications. {} skipped.",
             self.volumes.len(),
@@ -228,6 +237,14 @@ impl Scan {
                 "Read-only scan. No automatic boot or saved changes."
             }
         );
+        uefi::println!(
+            "Firmware filesystems: {} | Verified ESPs: {}",
+            self.filesystem_count,
+            self.volumes.len()
+        );
+        if let Some(status) = self.first_error {
+            uefi::println!("Partition identification: {status:?}");
+        }
         let first = selected / 4 * 4;
         for (i, target) in self.targets.iter().enumerate().skip(first).take(4) {
             uefi::println!(

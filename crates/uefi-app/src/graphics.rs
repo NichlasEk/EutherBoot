@@ -135,7 +135,7 @@ pub fn draw(labels: &[&str], selected: usize, notice: &str) -> Result<(), Status
         1,
         MUTED,
     );
-    c.text(w - 40 - 5 * 8, h - 44, "0.1.0", 1, GOLD);
+    c.text(w - 40 - 5 * 8, h - 44, env!("CARGO_PKG_VERSION"), 1, GOLD);
     gop.blt(BltOp::BufferToVideo {
         buffer: &c.pixels,
         src: BltRegion::Full,

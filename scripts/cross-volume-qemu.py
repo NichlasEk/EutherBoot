@@ -15,11 +15,11 @@ ROOT=Path(__file__).resolve().parent.parent
 CASES=('save','discard','missing','duplicate','non-esp','alias','self','self-copy','same-path-self','missing-file','missing-partition-info')
 p=argparse.ArgumentParser()
 p.add_argument('--case',choices=CASES,default='save')
-p.add_argument('--expect-legacy-missing',action='store_true')
+p.add_argument('--without-partition-info',action='store_true')
 p.add_argument('--width',type=int,default=1024)
 p.add_argument('--height',type=int,default=768)
 a=p.parse_args()
-out=ROOT/'artifacts'/f'cross-volume-{a.case}-{a.width}x{a.height}'
+out=ROOT/'artifacts'/f'cross-volume-{a.case}-{a.width}x{a.height}{"-gpt" if a.without_partition_info else ""}'
 out.mkdir(parents=True,exist_ok=True)
 IDS=['11111111-1111-4111-8111-111111111111','22222222-2222-4222-8222-222222222222','33333333-3333-4333-8333-333333333333']
 SHARED=r'\EFI\Tools\shared.efi'
@@ -49,8 +49,8 @@ with tempfile.TemporaryDirectory(prefix='eutherboot-cross-volume-') as tmp:
         shutil.copy2(ROOT/'artifacts/TestChild.efi',source/'EFI/Tools/shared.efi')
     (sources[0]/'EFI/BOOT').mkdir()
     (sources[0]/'EFI/EutherBoot').mkdir()
-    shutil.copy2(ROOT/'artifacts'/('EutherBoot-faults.efi' if a.case=='missing-partition-info' else 'EutherBoot.efi'),sources[0]/'EFI/BOOT/BOOTX64.EFI')
-    if a.case=='missing-partition-info':
+    shutil.copy2(ROOT/'artifacts'/('EutherBoot-faults.efi' if a.case=='missing-partition-info' or a.without_partition_info else 'EutherBoot.efi'),sources[0]/'EFI/BOOT/BOOTX64.EFI')
+    if a.case=='missing-partition-info' or a.without_partition_info:
         (sources[0]/'EFI/EutherBoot/volume-fault').write_text('missing-partition-info')
     original="[boot]\ndefault='own'\ntimeout=0\ntheme='system-regis'\n"+entry('own','Own volume',SHARED)
     if a.case not in ('save','discard'):
@@ -123,11 +123,11 @@ with tempfile.TemporaryDirectory(prefix='eutherboot-cross-volume-') as tmp:
             assert ('Duplicate EFI target' if a.case=='alias' else 'EutherBoot itself') in v.log.read_text()
             v.screen('rejected-config');time.sleep(2.3)
             assert 'CHILD_STARTED' not in v.log.read_text()
-        elif a.case in ('missing','duplicate','non-esp','missing-partition-info'):
+        elif a.case in ('missing','duplicate','non-esp'):
             assert 'DEFAULT_UNAVAILABLE' in v.log.read_text() and 'TIMEOUT_ARMED' not in v.log.read_text()
             time.sleep(2.3);assert 'CHILD_STARTED' not in v.log.read_text()
             v.key('ret','MENU_RESUMED');v.screen('unavailable')
-            expected = ('Firmware lacks PartitionInfo' if a.case=='missing-partition-info' and not a.expect_legacy_missing else 'Ambiguous ESP GUID' if a.case=='duplicate' else 'Missing ESP GUID')
+            expected = 'Ambiguous ESP GUID' if a.case=='duplicate' else 'Missing ESP GUID'
             assert expected in v.log.read_text()
             assert 'CHILD_STARTED' not in v.log.read_text()
             v.key('up','SELECT 0');offset=len(v.log.read_text());v.key('ret','CHILD_READY')
@@ -144,13 +144,14 @@ with tempfile.TemporaryDirectory(prefix='eutherboot-cross-volume-') as tmp:
             v.wait('CHILD_READY');assert 'TIMEOUT_FIRED' in v.log.read_text()
             assert f'CHILD_VOLUME {IDS[1]}' in v.log.read_text()
             v.key('ret','MENU_RESUMED')
-        if a.case=='missing-partition-info' and not a.expect_legacy_missing:
+        if a.case=='missing-partition-info':
+            assert f'ESP_GPT_FALLBACK {IDS[1]}' in v.log.read_text()
             offset=len(v.log.read_text())
             v.key('f4','DISCOVERY_READY')
             scan_log=v.log.read_text()[offset:]
-            assert 'DISCOVERY_VOLUME_ERROR NOT_FOUND' in scan_log
-            assert 'partial=true' in scan_log
-            v.screen('incomplete-discovery')
+            assert f'DISCOVERY_VOLUME {IDS[1]}' in scan_log
+            assert 'partial=false' in scan_log
+            v.screen('gpt-fallback-discovery')
             v.key('esc','DISCOVERY_CLOSED')
         v.key('esc','EXIT_FIRMWARE')
     assert digest(disk,1048576+64*1024*1024,128*1024*1024)==other_before

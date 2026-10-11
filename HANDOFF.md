@@ -2,6 +2,24 @@
 
 Uppdaterad 2026-10-10. **Fysisk EutherBoot-meny demonstrerad; GRUB-start blockerad av partitionsidentifieringen.**
 
+## Uppdatering 0.1.1 inför andra försöket
+
+2026-10-11: kompatibilitetsfix för saknat PartitionInfo. Reservvägen verifierar
+GPT via skrivskyddade BlockIO-läsningar och matchar GUID/typ/geometri mot exakt
+firmware-enhet. F4 visar antal firmware-filsystem och verifierade ESP:er samt
+första identifieringsfelet. Den laddar inga extra lagringsdrivrutiner.
+
+QEMU: start/återgång och F4 fungerar utan PartitionInfo; saknade/dubbla GUID och
+icke-ESP avvisas fortfarande. Normal väg och F4 i 640×480 passerar. 29 kärntester
+inkluderar CRC-fel, trasiga längder, fel GUID/geometri, attribut och 4K-block.
+Fysisk orsak är fortfarande en hypotes tills nästa test. Ny release/USB-evidens
+läggs i `artifacts/host-probe-0.1.1/`; originalleveransen lämnas som historik.
+Tidigare stickfiler finns i `artifacts/host-probe/pre-gpt-update/`.
+
+Nästa test: välj USB → kontrollera **0.1.1** → **F4** och fotografera hela
+sökresultatet → Esc → Existing boot loader. GRUB/Arch via den nya versionen
+är ännu inte fysiskt verifierat. Äldre avsnitt nedan beskriver första leveransen.
+
 ## Aktuell överlämning
 
 Första fysiska försöket har rapporterats med foto: System Regis-menyn visas,

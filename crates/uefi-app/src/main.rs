@@ -5,6 +5,7 @@ mod compiler_support;
 mod config;
 mod discovery;
 mod editor;
+mod gpt_fallback;
 mod graphics;
 mod image_services;
 mod images;
