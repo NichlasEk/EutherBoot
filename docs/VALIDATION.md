@@ -590,3 +590,19 @@ Not logged in, ingen auth-fil eller daemoninstallation. Resultat och
 launcherhashar: `artifacts/rescue/codex-start-fixed-result.json`.
 Detta verifierar inte en ombyggd ISO, uppdaterad sticka eller autentiserad
 AI-session. Den fysiska stickans workaround finns i rescue/README.md.
+
+## Rescue 0.1.1: ombyggd avbild
+
+ISO SHA-256: `958f0a2614c80c6da17124743a4a613e9519e6c8aeaaa11038ed174c6c18e44b`.
+Källsnapshot: `e89ed0b`, inklusive grafisk editor och korrigerad Codex-launcher.
+Bygggästen slutförde mkarchiso och explicit sync; avstängningen överskred
+60 sekunder. Avbilden hämtades från transferdisken efter att gästen stoppats.
+Nästa byggning tillåter 180 sekunder för gästens avstängning.
+
+Verifierat på den färdiga avbilden: Codex inloggningsvy från tomt state med
+`--installed-launchers` (hashkontrollerade inbyggda skript, ingen injicerad fix),
+katalogläge 700, ingen auth eller daemoninstallation och argumentvidarebefordran.
+Komplett USB-avbild klarade två UEFI-starter, nätverk, bootkopians checksummor,
+återkopiering till tom FAT och arbetsfil som överlevde omstart. Inga interna
+diskar eller värdens inloggning anslöts till testgästerna. Autentiserad session
+är fortfarande inte verifierad. Fysisk leverans dokumenteras i HANDOFF.md.

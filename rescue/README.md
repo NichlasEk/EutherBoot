@@ -1,4 +1,4 @@
-# Euther Rescue 0.1.0
+# Euther Rescue 0.1.1
 
 Arch live-USB med Codex CLI 0.162.1, reparationsverktyg, EutherBoot-källkod och
 valfri privat kopia av en verifierad startkedja. Starten använder systemd-boot
@@ -41,15 +41,18 @@ gptfdisk, util-linux och e2fsprogs. Befintlig verifierad Arch-fixture under
    `--include-known-good` endast med en redan verifierad privat snapshot.
 2. `python3 scripts/build-rescue-vm.py` bygger med mkarchiso som root i en
    disponibel qcow2-overlay. Inga värddiskar ansluts till gästen.
-3. `python3 scripts/test-rescue-qemu.py` verifierar två starter, Codex-binär,
-   nätverk, avsaknad av auth-token och beständig arbetsdata.
+3. `python3 scripts/test-rescue-start-qemu.py --installed-launchers` provar
+   riktig Codex-start till inloggningsvyn direkt från ISO:n. Därefter provar
+   `python3 scripts/test-rescue-qemu.py` två starter, nätverk, frånvaro av
+   auth-token och beständig arbetsdata.
 4. `python3 scripts/assemble-rescue-usb.py ISO OUTPUT --bytes KAPACITET`
    skapar en reguljär GPT-avbild med ISO, ESP och ext4 på återstående utrymme.
 5. `python3 scripts/test-rescue-qemu.py --usb-image OUTPUT` provar den faktiska
    USB-layouten via emulerad USB, med en skrivbar temporär overlay.
 
 `--resume --reuse-transfer` återanvänder en inspekterad bygg-overlay och samma
-profilarkiv. Efter kerneluppdatering krävs matchande `builder/bootstrap-kernel.efi`
+profilarkiv. Vid ny profil: använd `--resume --fresh-work` utan
+`--reuse-transfer`, så att mkarchiso inte återanvänder gamla byggsteg. Efter kerneluppdatering krävs matchande `builder/bootstrap-kernel.efi`
 och `builder/bootstrap.img`; starta inte en uppdaterad gästs rot med en gammal
 kärna vars moduler saknas. Dessa är lokala byggartefakter, inte värdens bootfiler.
 Byggloggar och JSON-resultat sparas under `artifacts/rescue/`.
@@ -111,6 +114,8 @@ En satt CODEX_HOME måste finnas enligt
 `python3 scripts/test-rescue-start-qemu.py` injicerar aktuella launchers i en
 disponibel gästs RAM och provar verklig terminalstart till inloggningsvyn,
 privata katalogrättigheter, argument och frånvaro av auth/daemoninstallation.
-Det testet ändrar inte befintlig ISO eller fysisk sticka. Nybyggd ISO ska också
+Det testet ändrar inte befintlig ISO eller fysisk sticka. Med
+`--installed-launchers` verifieras i stället launcherna som redan finns i ISO:n;
+ingen launcher injiceras. Nybyggd ISO ska också
 provas med de vanliga rescue-testerna före ny USB-leverans. Autentiserad session
 på testdatorn återstår.
