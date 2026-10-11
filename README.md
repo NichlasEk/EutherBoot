@@ -5,6 +5,12 @@
 A Rust-first x86_64 UEFI boot environment. Local control, private by design,
 freedom through understanding. No runtime network, telemetry or cloud services.
 
+Version **0.1.2** supports external Linux initrd images through 512 MiB and
+reports specific size/command-line errors. Debian 13 boots to login in QEMU
+with the exact production EFI and a 512 MiB initrd. The updated
+[Euther Rescue](rescue/README.md) includes that release, matching source and
+a [Debian installation guide](rescue/overlay/usr/local/share/euther-rescue/INSTALL-DEBIAN.md).
+
 The current prototype reads TOML from its own EFI volume, validates it strictly,
 displays configured EFI targets, and chainloads the selected application. It has
 configurable default/timeout, keyboard navigation, paginated menus and firmware

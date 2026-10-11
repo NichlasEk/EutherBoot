@@ -1,5 +1,11 @@
 # Euther Rescue
 
+Version 0.1.2 innehåller EutherBoot 0.1.2 med rättad initrd-gräns (512 MiB).
+För den aktuella Debian-datorn: läs `INSTALL-DEBIAN.md` i samma katalog.
+Starta Codex med `rescue-start` och be den läsa guiden och installera den
+medföljande versionen på rätt Debian-installation. Arbetskopian heter
+`EutherBoot-0.1.2`; tidigare arbetskopior lämnas kvar.
+
 Detta är en självständig Arch live-miljö. Interna diskar monteras inte automatiskt.
 Användaren rescue har sudo för manuella reparationer. Ingen SSH-server startas.
 

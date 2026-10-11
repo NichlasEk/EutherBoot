@@ -1,5 +1,70 @@
 # Validation · 2026-10-10 · Arch kernel updates and LoadFile2
 
+## EutherBoot 0.1.2 large initrd · 2026-10-11
+
+The production policy now allows 1 byte through 512 MiB of external initrd.
+Debian QEMU tests pass with 128 MiB + 1 byte and exactly 512 MiB. Negative
+tests reject 512 MiB + 1 byte, empty initrd and insufficient kernel cmdline
+capacity with specific diagnostics; the independent recovery EFI child
+starts and returns after each rejection. See `artifacts/debian/*/result.json`.
+The earlier 128/256 MiB investigation is archived under
+`artifacts/debian/investigation-011/` and does not describe the new policy.
+
+The exact non-debug production EFI also booted the 512 MiB Debian case to
+login (`production-maximum/result.json`), SHA-256
+`7ecc51be45799dc07ae7dc80032f3898ca5d713673f6172bc487d4b70a57c91f`.
+All 32 boot-core tests and eight LoadFile2 lifetime/error cases passed.
+
+## Euther Rescue 0.1.2 · 2026-10-11
+
+The final ISO and complete USB image each passed two QEMU cold boots,
+embedded production EFI/source hashes, network access and persistent work
+across reboot. The ISO's own Codex launchers reached onboarding without an
+injected fix; an old `work/EutherBoot` sentinel remained unchanged and the
+new `work/EutherBoot-0.1.2` snapshot contained the correct release version.
+No credentials or host disks were attached to the guests.
+
+The USB test exposed an intermittent Archiso UUID selection bug: a hybrid
+ISO has the same filesystem UUID on the whole disk and its ISO partition.
+In a failed run `/run/archiso/bootmnt` used `/dev/sda`, preventing `/dev/sda3`
+from opening for ext4 mount. The assembler now binds `archisodevice` to the
+exact ISO partition PARTUUID in the USB's FAT loader entry. It verifies that
+entry after writing. Final USB tests assert the mounted source is a partition,
+and verify data mounting and persistence across both boots. Optical ISO boot
+retains its original UUID selection. Internal partitions need not be scanned.
+
+One concurrent optical ISO run exceeded the test's 60-second shutdown bound;
+the final retry used a 180-second allowance and both shutdowns completed in
+3.9 seconds. This does not establish the cause of the earlier timeout.
+The complete USB image's two shutdowns also completed normally.
+
+Final ISO SHA-256:
+`5a10ca0138d4a35f275e50fa9078af2fb9cdec4c76b38a1ce3e7ae80a7cf05e5`.
+Complete USB image SHA-256:
+`76e54df30b08fc6d701be9e6d057f586f5114b7322b367b478b3049c88ff9b75`.
+See `artifacts/rescue/{build-result,test-result,usb-test-result,codex-start-fixed-result}.json`.
+Physical USB readback/delivery is recorded separately in `usb-delivery.json`;
+physical 0.1.2 boot and installation on Debian remain separate gates.
+
+Delivery completed: all 15,728,640,000 physical USB bytes were read back after
+fsync and matched the complete image SHA-256 above. After that full check,
+partitions were remounted; geometry, six ESP file hashes, embedded production
+EFI/source hashes, the Debian guide and the explicit ISO PARTUUID boot entry
+were verified from the physical USB. Data was left mounted at EUTHERDATA.
+The ext4 mount can subsequently change filesystem metadata; the whole-device
+hash records the verified pre-mount state. Host internal boot/NVRAM were not
+modified, and the new physical boot remains untested.
+
+## Debian 13 initrd size investigation · 2026-10-11
+
+Three QEMU/KVM cases passed: original Debian cloud kernel/initrd to login,
+initrd padded to 128 MiB + 1 byte rejected with the photographed
+`Linux EFI setup: BAD_BUFFER_SIZE` and working recovery child, and the same
+padded initrd to login with an isolated 256 MiB-cap experiment build.
+Production loader source is unchanged. See [DEBIAN-QEMU.md](DEBIAN-QEMU.md)
+for hashes, commands, boot-oracle limits and the still-unconfirmed physical
+diagnosis. Source image and test ESP hashes remained unchanged.
+
 ## OS icon gallery · 2026-10-11
 
 32 embedded OS masks cover Windows, 30 Linux distributions/variants and generic

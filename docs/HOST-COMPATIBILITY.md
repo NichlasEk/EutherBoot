@@ -16,7 +16,8 @@ The first inventory exposed these differences from the original cloud fixture:
   normal initramfs and fallback initramfs.
 - The udev/busybox initramfs includes NVIDIA modules; its normal image is about
   257 MiB. The installed NVIDIA package targets the regular kernel; matching
-  LTS modules also need validation before an LTS initramfs can be relied on. An external `linux-efi` initrd exceeds the current 128 MiB loader limit.
+  LTS modules also need validation before an LTS initramfs can be relied on. At that time an external `linux-efi` initrd exceeded the 128 MiB loader limit.
+  EutherBoot 0.1.2 raises that bounded limit to 512 MiB.
   A self-contained UKI uses ordinary EFI chainloading and does not use that
   external-initrd path, but needs adequate ESP space.
 - About 419 MiB is free on the 1 GiB ESP. The old fixed 384 MiB check was inadequate

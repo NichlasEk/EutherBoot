@@ -46,7 +46,7 @@ p.write_text(s)
 iso_label="EUTHER_RESCUE"
 iso_publisher="EutherBoot"
 iso_application="System Regis Arch Rescue"
-iso_version="0.1.1"
+iso_version="0.1.2"
 install_dir="arch"
 bootmodes=('uefi.systemd-boot')
 pacman_conf="pacman.conf"
@@ -93,9 +93,9 @@ share=ai/'usr/local/share/euther-rescue'
 release=ROOT/'artifacts/release'
 for name in ['EutherBoot.efi','eutherboot-source.tar.gz','manifest.json','SHA256SUMS']:
     shutil.copy2(release/name,share/name)
-# Only explicit repository files, no host home, logs, authentication or untracked data.
+# Reviewed repository files, including new source/docs; ignored artifacts and host home are excluded.
 repo=share/'EutherBoot';repo.mkdir()
-files=subprocess.check_output(['git','ls-files','-z'],cwd=ROOT).decode().split('\0')
+files=subprocess.check_output(['git','ls-files','-z','--cached','--others','--exclude-standard'],cwd=ROOT).decode().split('\0')
 for name in filter(None,files):
     source=ROOT/name
     if source.is_file():
@@ -106,7 +106,7 @@ if args.include_known_good:
     for name,digest in manifest['files'].items():
         assert hashlib.sha256((known/name).read_bytes()).hexdigest()==digest
     shutil.copytree(known,share/'known-good')
-metadata={'private_known_good_included':args.include_known_good,'codex_version':version,'registry_url':url,'tarball':meta['dist']['tarball'],'integrity':meta['dist']['integrity'],'git_commit':subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),'archiso':subprocess.check_output(['pacman','-Q','archiso'],text=True).strip(),'credentials_included':False,'codex_license_url':license_url,'codex_license_sha256':hashlib.sha256(license_data).hexdigest()}
+metadata={'rescue_version':'0.1.2','private_known_good_included':args.include_known_good,'codex_version':version,'registry_url':url,'tarball':meta['dist']['tarball'],'integrity':meta['dist']['integrity'],'git_commit':subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),'dirty':bool(subprocess.check_output(['git','status','--porcelain'],cwd=ROOT,text=True).strip()),'archiso':subprocess.check_output(['pacman','-Q','archiso'],text=True).strip(),'credentials_included':False,'codex_license_url':license_url,'codex_license_sha256':hashlib.sha256(license_data).hexdigest()}
 (out/'profile-manifest.json').write_text(json.dumps(metadata,indent=2)+'\n')
 (share/'profile-manifest.json').write_text(json.dumps(metadata,indent=2)+'\n')
 print(profile)

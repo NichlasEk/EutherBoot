@@ -1,5 +1,64 @@
 # EutherBoot – System Regis och rescue-USB
 
+## Ny räddningsutgåva 0.1.2 för Debian · 2026-10-11
+
+EutherBoot 0.1.2 höjer direktstartens initrd-gräns till **512 MiB** och skiljer
+storleksfel, för lång cmdline och växande initrd i feltexten. Debian 13 har i
+QEMU startat med 128 MiB + 1 byte och exakt 512 MiB; 512 MiB + 1 byte, tom
+initrd och för liten kernel-cmdlinekapacitet avvisas med fungerande reservval.
+
+Euther Rescue 0.1.2 är levererad på General UDisk med denna produktions-EFI, matchande källarkiv,
+ny källsnapshot och `/usr/local/share/euther-rescue/INSTALL-DEBIAN.md`.
+**På Debian-datorn ska Codex börja med den guiden.** Arch-identiteterna längre
+ned gäller en annan dator och ska inte användas som installationsmål där.
+`rescue-start` använder `EutherBoot-0.1.2` så att en gammal arbetskopia inte
+skymmer rättelsen.
+
+Hela stickans **15 728 640 000 byte** har lästs tillbaka efter skrivning och
+fsync; SHA-256 matchar den QEMU-testade USB-avbilden:
+`76e54df30b08fc6d701be9e6d057f586f5114b7322b367b478b3049c88ff9b75`.
+Kontrollen gjordes före återmontering. Partitionsgeometri, sex ESP-filer och
+den inbyggda 0.1.2-EFI:n, källarkivet och Debian-guiden verifierades också.
+Datapartitionen är monterad på `/run/media/nichlas/EUTHERDATA`.
+Mata ut stickan före fysisk flytt. Ingen intern EFI/NVRAM har ändrats här.
+
+ISO: `artifacts/rescue/euther-rescue-0.1.2-x86_64.iso`.
+ISO SHA-256: `5a10ca0138d4a35f275e50fa9078af2fb9cdec4c76b38a1ce3e7ae80a7cf05e5`.
+Medföljande EutherBoot-EFI SHA-256:
+`7ecc51be45799dc07ae7dc80032f3898ca5d713673f6172bc487d4b70a57c91f`.
+ISO/USB har vardera klarat två QEMU-starter, nätverk och beständig arbetsdata.
+Codex når inloggningsvyn med ISO:ns egna startskript. Evidens:
+`artifacts/rescue/usb-delivery.json` och `release-012-validation.json`.
+Privata ISO-/backup-/loggartefakter är fortsatt Git-ignorerade.
+
+Nästa steg på Debian-datorn: starta General UDisk, kör
+`codex login --device-auth`, sedan `rescue-start`. Be Codex läsa
+`/usr/local/share/euther-rescue/INSTALL-DEBIAN.md` och installera den medföljande
+0.1.2-versionen på den identifierade Debian-installationen. **Fysisk start av
+nya räddningsutgåvan och faktisk Debian-start efter installation återstår.**
+
+USB-provet hittade också att Archiso:s UUID-sökning ibland monterade hela
+USB-disken som ISO och blockerade EUTHERDATA. USB-avbildens startpost binds nu
+till ISO-partitionens exakta PARTUUID; testet kontrollerar att den emulerade
+USB-starten faktiskt monterar en partition. Interna partitioner behöver inte
+sökas igenom för att hitta live-systemet.
+
+## Historik: första Debian 13-undersökningen · 2026-10-11
+
+Användarens andra dator visar `Linux EFI setup: BAD_BUFFER_SIZE`; Windows
+reparation och Pop!_OS startade via F4 enligt användaren. Fler fysiska prov
+väntar. Debian 13:s officiella cloudbild har nu provats i QEMU: originalets
+initrd på 36 847 801 byte startar till inloggning, samma fil nollutfylld till
+134 217 729 byte ger exakt feltexten. Ett separat experimentbygge med enbart
+128 → 256 MiB initrd-gräns startar också den stora filen till inloggning.
+
+Det bekräftar felmekanismen i emulatorn, **inte orsaken på den fysiska datorn**.
+Nästa kontroll där är den valda Debian-postens konfiguration och initrd-storlek.
+Vid den första undersökningen ändrades inte produktionsgränsen, installerad
+EFI eller USB. Den efterföljande 0.1.2-leveransen beskrivs ovan. Se
+`docs/DEBIAN-QEMU.md` för reproduktion, avgränsningar och evidens under
+`artifacts/debian/`. Arch/LTS-status nedan gäller fortsatt separat.
+
 ## Nu: nya OS-ikoner installerade · 2026-10-11
 
 EutherBoot på den interna ESP:n är uppdaterad med **32 ikoner**: Windows,

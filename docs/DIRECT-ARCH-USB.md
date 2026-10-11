@@ -20,7 +20,8 @@ Menyn använder System Regis, svenska och timeout 0:
 
 UKI betyder här att kärna, initramfs, os-release och kommandorad samlas i en
 EFI-fil med systemd-stub. EutherBoot startar den som en EFI-applikation; den
-separata linux-efi-vägens gräns på 128 MiB för initrd används därför inte.
+separata linux-efi-vägens initrd-gräns används därför inte (128 MiB vid detta
+prov, höjd till 512 MiB i EutherBoot 0.1.2).
 Ingen kärna eller initramfs optimeras eller byggs om för detta test. Det normala
 initramfs-arkivet innehåller redan Intel-mikrokod. systemd-ukify installeras inte
 på värden; PE-sektionerna byggs med samma objcopy-metod som Linux-fixturerna.

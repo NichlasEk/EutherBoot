@@ -1,4 +1,38 @@
-# Euther Rescue 0.1.1
+# Euther Rescue 0.1.2
+
+Denna utgåva innehåller EutherBoot 0.1.2 med 512 MiB initrd-gräns och tydliga
+storleksfel, den aktuella källkoden och `INSTALL-DEBIAN.md` för Codex på
+Debian-datorn. Kör `rescue-start` och be Codex läsa den medföljande guiden
+och installera den nya versionen. Arbetskopian heter `EutherBoot-0.1.2`;
+äldre arbetskopior skrivs inte över. Historiska leveranser nedan är separata.
+
+USB-avbildens startpost binds till ISO-partitionens exakta PARTUUID.
+Det undviker ett observerat kapplöpningsfel där samma ISO-UUID kunde välja
+hela USB-disken och därmed blockera montering av EUTHERDATA. Inga interna
+partitioner behöver sökas igenom för att hitta live-systemet.
+
+## Leverans av 0.1.2 · 2026-10-11
+
+General UDisk är uppdaterad, synkad och fullständigt återläst: samtliga
+15 728 640 000 byte matchar den testade USB-avbildens SHA-256
+`76e54df30b08fc6d701be9e6d057f586f5114b7322b367b478b3049c88ff9b75`.
+Verifieringen skedde före återmontering. Därefter verifierades geometri,
+sex EFI-partitionsfiler och de medföljande EutherBoot-/källarkivsfilerna mot
+releasemanifestet direkt från stickan. Debian-guiden finns med.
+Datapartitionen lämnas monterad på `/run/media/nichlas/EUTHERDATA`.
+
+ISO: `artifacts/rescue/euther-rescue-0.1.2-x86_64.iso`, SHA-256
+`5a10ca0138d4a35f275e50fa9078af2fb9cdec4c76b38a1ce3e7ae80a7cf05e5`.
+Produktions-EFI SHA-256:
+`7ecc51be45799dc07ae7dc80032f3898ca5d713673f6172bc487d4b70a57c91f`.
+Båda avbildsformaten klarade två QEMU-starter, beständig arbetsdata och nätverk.
+Riktig Codex-start nådde inloggningsvyn med ISO:ns egna launchers. Fysisk
+0.1.2-start och installation/start på Debian-datorn återstår. Evidens finns
+i `artifacts/rescue/usb-delivery.json` och `release-012-validation.json`.
+
+Mata ut före flytt, starta stickan, kör `codex login --device-auth` och
+`rescue-start`. Be Codex läsa `/usr/local/share/euther-rescue/INSTALL-DEBIAN.md`
+och installera den medföljande versionen på rätt Debian-installation.
 
 Arch live-USB med Codex CLI 0.162.1, reparationsverktyg, EutherBoot-källkod och
 valfri privat kopia av en verifierad startkedja. Starten använder systemd-boot

@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import argparse,hashlib,json,os,shutil,socket,subprocess,tempfile,threading,time
 from guest_console import drain,wait,command
 ROOT=Path(__file__).resolve().parents[1]
-out=ROOT/'artifacts/rescue';iso=out/'euther-rescue-0.1.1-x86_64.iso'
+out=ROOT/'artifacts/rescue';iso=out/'euther-rescue-0.1.2-x86_64.iso'
 parser=argparse.ArgumentParser();parser.add_argument('--usb-image',type=Path);parser.add_argument('--installed-launchers',action='store_true');options=parser.parse_args()
 assert iso.is_file()
 results=[]
@@ -57,12 +57,15 @@ with tempfile.TemporaryDirectory(prefix='euther-rescue-test-') as directory:
                         for start in range(0,len(data),1000):
                             command(v,serial,"printf %s "+shlex.quote(data[start:start+1000])+" >> /tmp/transfer.b64")
                         command(v,serial,"base64 -d /tmp/transfer.b64 > /tmp/transfer; sudo install -m 755 /tmp/transfer "+destination)
-                    command(v,serial,'test ! -d "$HOME/.codex"; python /tmp/probe.py rescue-start',timeout=150)
+                    command(v,serial,'mkdir -p "$HOME/work/EutherBoot"; printf old-work > "$HOME/work/EutherBoot/keep"; test ! -d "$HOME/.codex"; python /tmp/probe.py rescue-start',timeout=150)
                     command(v,serial,"""test -d "$HOME/.codex"
 test "$(stat -c %a "$HOME/.codex")" = 700
 test ! -e "$HOME/.codex/auth.json"
 test ! -d "$HOME/.codex/packages/app-server-daemon"
 rescue-start --version
+test "$(cat "$HOME/work/EutherBoot/keep")" = old-work
+test -s "$HOME/work/EutherBoot-0.1.2/HANDOFF.md"
+grep -q 'version = "0.1.2"' "$HOME/work/EutherBoot-0.1.2/crates/uefi-app/Cargo.toml"
 codex login status > /tmp/login-status 2>&1 && exit 1
 grep -q 'Not logged in' /tmp/login-status
 df -h /

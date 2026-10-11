@@ -38,7 +38,7 @@ pub fn chainload(entry: &boot_core::config::Entry) -> Result<(), LoadError> {
     let prepared = if entry.kind() == boot_core::config::EntryKind::LinuxEfi {
         Some(
             crate::linux::prepare(device, entry)
-                .map_err(|s| LoadError::Target(alloc::format!("Linux EFI setup: {s:?}")))?,
+                .map_err(|s| LoadError::Target(alloc::format!("Linux EFI setup: {s}")))?,
         )
     } else {
         None

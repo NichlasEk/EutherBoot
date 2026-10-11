@@ -56,9 +56,9 @@ with (base/'qemu.log').open('w') as err:
             command(v,serial,'sudo mkarchiso -v -w /build/work -o /transfer /build/profile 2>&1 | tee /transfer/mkarchiso.log',timeout=3600)
             command(v,serial,'sudo cp /build/work/iso/arch/pkglist.x86_64.txt /transfer/; sync')
             serial.sendall(b'sudo systemctl poweroff\n');proc.wait(timeout=180)
-        subprocess.run(['mcopy','-o','-i',str(disk),'::/euther-rescue-0.1.1-x86_64.iso',str(out/'euther-rescue-0.1.1-x86_64.iso')],check=True)
+        subprocess.run(['mcopy','-o','-i',str(disk),'::/euther-rescue-0.1.2-x86_64.iso',str(out/'euther-rescue-0.1.2-x86_64.iso')],check=True)
         subprocess.run(['mcopy','-o','-i',str(disk),'::/mkarchiso.log',str(out/'mkarchiso.log')],check=True)
-        result={'iso':str(out/'euther-rescue-0.1.1-x86_64.iso'),'sha256':sha(out/'euther-rescue-0.1.1-x86_64.iso'),'source_image_unchanged':sha(image)==manifest['image_sha256'],'host_disks_attached':False,'network':'QEMU NAT, no port forwarding','builder':'disposable official Arch qcow2 overlay'}
+        result={'iso':str(out/'euther-rescue-0.1.2-x86_64.iso'),'sha256':sha(out/'euther-rescue-0.1.2-x86_64.iso'),'source_image_unchanged':sha(image)==manifest['image_sha256'],'host_disks_attached':False,'network':'QEMU NAT, no port forwarding','builder':'disposable official Arch qcow2 overlay'}
         (out/'build-result.json').write_text(json.dumps(result,indent=2)+'\n')
         print(json.dumps(result),flush=True)
     finally:

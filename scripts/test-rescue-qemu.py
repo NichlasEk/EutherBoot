@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import argparse,hashlib,json,os,shutil,socket,subprocess,tempfile,threading,time
 from guest_console import drain,wait,command
 ROOT=Path(__file__).resolve().parents[1]
-out=ROOT/'artifacts/rescue';iso=out/'euther-rescue-0.1.1-x86_64.iso'
+out=ROOT/'artifacts/rescue';iso=out/'euther-rescue-0.1.2-x86_64.iso'
 parser=argparse.ArgumentParser();parser.add_argument('--usb-image',type=Path);options=parser.parse_args()
 assert iso.is_file()
 results=[]
@@ -51,6 +51,9 @@ codex login status >/tmp/codex-auth 2>&1 && exit 1
 ! test -f "$HOME/.codex/auth.json"
 test -s /usr/local/share/euther-rescue/EutherBoot/HANDOFF.md
 test -s /usr/local/share/euther-rescue/eutherboot-source.tar.gz
+test -s /usr/local/share/euther-rescue/INSTALL-DEBIAN.md
+python -c 'import hashlib,json,pathlib; p=pathlib.Path("/usr/local/share/euther-rescue"); m=json.loads((p/"manifest.json").read_text()); assert m["qemu_debug"] is False; assert all(hashlib.sha256((p/n).read_bytes()).hexdigest()==m["files"][n] for n in ("EutherBoot.efi","eutherboot-source.tar.gz")); assert json.loads((p/"profile-manifest.json").read_text())["rescue_version"]=="0.1.2"'
+grep -q 'version = "0.1.2"' /usr/local/share/euther-rescue/EutherBoot/crates/uefi-app/Cargo.toml
 test -x /opt/codex/codex-resources/bwrap
 test -x /opt/codex/bin/codex-code-mode-host
 unshare -Ur true
@@ -59,9 +62,10 @@ cd /usr/local/share/euther-rescue/known-good
 sha256sum --quiet -c SHA256SUMS
 fi
 cd "$HOME"
-rescue-data DATA_DEVICE
+test "$(lsblk -dn -o TYPE "$(findmnt -n -o SOURCE /run/archiso/bootmnt)")" = BOOT_DEVICE_TYPE
+rescue-data DATA_DEVICE || { lsblk -o NAME,FSTYPE,LABEL,MOUNTPOINTS; findmnt; sudo dmesg | tail -60; exit 1; }
 findmnt /mnt/rescue-data
-'''.replace('DATA_DEVICE','/dev/sda3' if options.usb_image else '/dev/vda'))
+'''.replace('DATA_DEVICE','/dev/sda3' if options.usb_image else '/dev/vda').replace('BOOT_DEVICE_TYPE','part' if options.usb_image else 'rom'))
                     assert 'codex-cli 0.162.1' in log
                     if iteration==1:
                         command(v,serial,'''if test -d /usr/local/share/euther-rescue/known-good/usb/EFI; then
@@ -85,8 +89,10 @@ fi''')
                                 response=json.loads(stream.readline())
                                 if 'error' in response:raise RuntimeError(response)
                                 if 'return' in response:break
-                    results.append({'boot':iteration,'codex_cli':'0.162.1','no_credentials':True,'data_mounted':True,'persistence_verified':iteration==2,'network_verified':iteration==1})
-                    serial.sendall(b'sudo systemctl poweroff\n');proc.wait(timeout=60)
+                    results.append({'boot':iteration,'codex_cli':'0.162.1','no_credentials':True,'release_012_hashes_verified':True,'debian_install_guide':True,'data_mounted':True,'persistence_verified':iteration==2,'network_verified':iteration==1})
+                    shutdown_started=time.monotonic()
+                    serial.sendall(b'sudo systemctl poweroff\n');proc.wait(timeout=180)
+                    results[-1]['shutdown_seconds']=round(time.monotonic()-shutdown_started,1)
                 print(f'PASS rescue boot {iteration}',flush=True)
             finally:
                 if proc.poll() is None:
