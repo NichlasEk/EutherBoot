@@ -1,6 +1,6 @@
 # EutherBoot – visuellt lyft, räddnings-USB och ersättning av GRUB
 
-Datum: 2026-10-11. Status: plan; genomförandet börjar med utseendet.
+Datum: 2026-10-11. Status: grafisk meny/editor implementerade; rescue-USB skrivet, fysiskt test återstår.
 
 ## Mål och ordning
 
@@ -195,3 +195,7 @@ och ersätter inte backup av personliga data.
 **Börja med etapp 1: huvudmenyns visuella utformning.** Räddnings-USB och
 ersättningen av GRUB är planerade efterföljande arbeten. Den här planfilen
 installerar inget, skriver inget USB och ändrar ingen bootordning.
+
+## Nästa prioriteringar efter USB-leveransen
+
+Se [rEFInd-genomgång och Secure Boot-spår](docs/REFIND-REVIEW.md).

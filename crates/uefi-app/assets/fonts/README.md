@@ -1,13 +1,13 @@
 # Regis embedded glyph masks
 
-The main menu embeds antialiased ASCII glyph masks generated from Liberation
+The main menu embeds antialiased ASCII and Swedish glyph masks generated from Liberation
 Sans Regular (16 px) and Liberation Serif Regular (42 px). These assets retain
 the SIL Open Font License; see LICENSE for attribution and full terms.
 
-The binary format stores characters 32 through 126, each as one advance byte
+The binary format stores characters 32 through 126 followed by ÅÄÖåäöÉé, each as one advance byte
 followed by an 8-bit coverage mask. Body cells are 20 by 24; title cells 48 by 56.
 No runtime font lookup, disk access or font parsing is required. Unsupported
-characters render as a question mark; the configuration remains ASCII-only.
+characters render as a question mark; display names accept the supported alphabet. Technical paths remain ASCII.
 
 Regenerate with `python3 scripts/build-fonts.py` using Python Pillow and the
 Liberation fonts under `/usr/share/fonts/liberation/`. Normal Rust builds use

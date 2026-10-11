@@ -15,7 +15,7 @@ import tomllib
 import virtual_disk
 
 ROOT=Path(__file__).resolve().parent.parent
-CASES=('discard','save','invalid','readonly','after-stage','after-backup','after-install')
+CASES=('appearance','discard','save','invalid','readonly','after-stage','after-backup','after-install')
 p=argparse.ArgumentParser()
 p.add_argument('--case',choices=CASES,default='save')
 p.add_argument('--width',type=int,default=1024)
@@ -66,7 +66,11 @@ class VM:
             time.sleep(.03)
     def key(self,key,marker=None,delay=.08):
         before=len(self.log.read_text());self.command('human-monitor-command',{'command-line':f'sendkey {key} 30'})
-        if marker:self.wait(marker,before)
+        if marker:
+            self.wait(marker,before)
+            if marker in ('EDITOR_UPDATED','EDITOR_DRAFT','EDITOR_VALID','EDITOR_INVALID','EDITOR_SAVE_CANCELLED'):
+                after=self.log.read_text().index(marker,before)+len(marker)
+                self.wait('EDITOR_READY',after)
         time.sleep(delay)
     def text(self,text):
         names={'\\':'backslash',' ': 'spc','.':'dot','-':'minus','_':'shift-minus',':':'shift-semicolon',"'":'apostrophe','/':'slash'}
@@ -75,7 +79,23 @@ class VM:
             self.key(name,'PROMPT_CHANGED',.045)
     def field(self,hotkey,field,value):
         self.key(hotkey,f'PROMPT_READY {field}');self.key('f4','PROMPT_CHANGED');self.text(value);self.key('ret','EDITOR_UPDATED')
-    def screen(self,name):self.command('screendump',{'filename':str(self.base/f'{name}.ppm')})
+    def screen(self,name):
+        path=self.base/f'{name}.ppm'
+        self.command('screendump',{'filename':str(path)})
+        if a.case=='appearance':
+            pixels=path.read_bytes().split(b'\n',3)[3]
+            backgrounds={'light-theme':(233,231,224),'contrast-theme':(0,0,0),'regis-swedish':(9,15,24),'persisted-light-menu':(233,231,224),'discard-restores-live-theme':(233,231,224)}
+            if name in backgrounds:
+                # EDITOR_DISCARD precedes the caller's final menu paint. Wait for
+                # the visible palette, not merely the state-transition marker.
+                deadline=time.monotonic()+10
+                while pixels.count(bytes(backgrounds[name]))<=a.width*a.height//5:
+                    assert self.proc.poll() is None and time.monotonic()<deadline, f'Incorrect theme in {name}'
+                    time.sleep(.05)
+                    self.command('screendump',{'filename':str(path)})
+                    pixels=path.read_bytes().split(b'\n',3)[3]
+
+
     def open_editor(self):self.key('f3','EDITOR_READY')
     def draft(self):self.key('e','EDITOR_DRAFT')
     def stop(self,powercut=False):
@@ -96,10 +116,13 @@ with tempfile.TemporaryDirectory(prefix='eutherboot-editor-') as tmp:
     tmp=Path(tmp);esp=tmp/'esp';(esp/'EFI/BOOT').mkdir(parents=True)
     for name in ('EutherBoot','Recovery','New'):(esp/'EFI'/name).mkdir()
     binary=ROOT/'artifacts'/('EutherBoot-faults.efi' if FAULT else 'EutherBoot.efi')
+    binary_digest=hashlib.sha256(binary.read_bytes()).hexdigest()
     shutil.copy2(binary,esp/'EFI/BOOT/BOOTX64.EFI')
     for name in ('EutherBoot/TestChild.efi','Recovery/rescue.efi','New/loader.efi'):
         shutil.copy2(ROOT/'artifacts/TestChild.efi',esp/'EFI'/name)
     original=(ROOT/'eutherboot.toml').read_bytes()+b"\n# Recovery fixture\n[[entry]]\nid='rescue'\nname='Recovery test'\ntype='efi'\npath='\\EFI\\Recovery\\rescue.efi'\n"
+    if a.case=='appearance':
+        original=original.replace(b'[boot]',b'[boot]\nlanguage="sv"').replace(b'EFI test application','Räddningsmiljö ÅÄÖåäö'.encode())
     (esp/'EFI/EutherBoot/eutherboot.toml').write_bytes(original)
     if FAULT:(esp/'EFI/EutherBoot/editor-fault').write_text(a.case)
     disk=virtual_disk.create(esp,tmp)
@@ -116,7 +139,21 @@ with tempfile.TemporaryDirectory(prefix='eutherboot-editor-') as tmp:
         vm.key('s','EDITOR_READY')  # Read-only mode ignores save.
         assert 'EDITOR_CONFIRM' not in vm.log.read_text()
         vm.draft()
-        if a.case=='invalid':
+        if a.case=='appearance':
+            vm.key('n','PROMPT_READY name');vm.text(' 2');vm.key('ret','EDITOR_UPDATED')
+            vm.key('f6','EDITOR_DETAILS');vm.screen('swedish-details');vm.key('esc','EDITOR_READY')
+            vm.key('g','EDITOR_UPDATED');vm.screen('text-theme')
+            vm.key('g','EDITOR_UPDATED');vm.screen('light-theme')
+            vm.key('f5','EDITOR_PREVIEW');vm.screen('light-preview');vm.key('spc','EDITOR_READY')
+            vm.key('g','EDITOR_UPDATED');vm.screen('contrast-theme')
+            vm.key('f5','EDITOR_PREVIEW');vm.screen('contrast-preview');vm.key('spc','EDITOR_READY')
+            vm.key('l','EDITOR_UPDATED');vm.screen('english');vm.key('l','EDITOR_UPDATED')
+            vm.key('g','EDITOR_UPDATED');vm.screen('regis-swedish')
+            vm.key('f2','EDITOR_READY');vm.screen('text-fallback');vm.key('f2','EDITOR_READY')
+            vm.key('s','EDITOR_CONFIRM');vm.screen('swedish-confirm');vm.key('n','EDITOR_SAVE_CANCELLED')
+            vm.key('g','EDITOR_UPDATED');vm.key('g','EDITOR_UPDATED')
+            vm.key('s','EDITOR_CONFIRM');vm.key('y','EDITOR_SAVED');vm.wait('CONFIG_OK')
+        elif a.case=='invalid':
             vm.field('p','path','\\EFI\\BOOT\\BOOTX64.EFI');vm.key('v','EDITOR_INVALID');vm.key('s','EDITOR_INVALID')
             assert 'EDITOR_CONFIRM' not in vm.log.read_text()
             vm.field('p','path','\\EFI\\EutherBoot\\TestChild.efi')
@@ -150,16 +187,26 @@ with tempfile.TemporaryDirectory(prefix='eutherboot-editor-') as tmp:
                     vm.key('y',f'FAULT_WAIT {a.case}');vm.stop(powercut=True)
                 else:
                     vm.key('y','EDITOR_SAVE_ERROR');vm.screen('write-error')
-                    assert 'WRITE_PROTECTED' in (vm.base/'serial.log').read_text()
+                    assert 'WRITE_PROTECTED' in vm.log.read_text()
                     vm.key('esc','EDITOR_CONFIRM');vm.key('y','EDITOR_DISCARD')
         if not FAULT:vm.stop()
     evidence('after-first-boot')
-    if a.case in ('discard','invalid','readonly'):
+    if a.case=='appearance':
+        saved=tomllib.loads(read_file('eutherboot.toml').decode())
+        assert saved['boot']['theme']=='system-regis-light' and saved['boot']['language']=='sv'
+        assert saved['entry'][0]['name']=='Räddningsmiljö ÅÄÖåäö 2'
+        assert read_file('eutherboot.toml.bak')==original
+        with VM(tmp,disk,2) as vm:
+            vm.screen('persisted-light-menu');vm.open_editor();vm.screen('persisted-swedish-editor')
+            vm.draft();vm.key('l','EDITOR_UPDATED');vm.key('g','EDITOR_UPDATED')
+            vm.key('esc','EDITOR_CONFIRM');vm.key('y','EDITOR_DISCARD');vm.screen('discard-restores-live-theme')
+        assert tomllib.loads(read_file('eutherboot.toml').decode())==saved
+    elif a.case in ('discard','invalid','readonly'):
         assert read_file('eutherboot.toml')==original
         assert all(read_file('eutherboot.toml'+s) is None for s in ('.new','.bak','.txn'))
     elif a.case=='save':
         saved=read_file('eutherboot.toml');c=tomllib.loads(saved.decode())
-        assert c['boot']=={'default':'extra','timeout':4,'theme':'text'}
+        assert c['boot']=={'default':'extra','timeout':4,'theme':'text','language':'en'}
         assert [e['id'] for e in c['entry']]==['rescue','extra']
         assert read_file('eutherboot.toml.bak')==original
         assert read_file('eutherboot.toml.new') is None and read_file('eutherboot.toml.txn') is None
@@ -189,5 +236,5 @@ with tempfile.TemporaryDirectory(prefix='eutherboot-editor-') as tmp:
         final=read_file('eutherboot.toml')
         assert final==original if a.case!='after-install' else tomllib.loads(final.decode())['boot']['timeout']==2
     evidence('final')
-    (out/'result.txt').write_text(f'PASS {a.case}\nOriginal SHA256: {hashlib.sha256(original).hexdigest()}\nFinal SHA256: {hashlib.sha256(read_file("eutherboot.toml")).hexdigest()}\n')
+    (out/'result.txt').write_text(f'PASS {a.case}\nEFI SHA256: {binary_digest}\nOriginal SHA256: {hashlib.sha256(original).hexdigest()}\nFinal SHA256: {hashlib.sha256(read_file("eutherboot.toml")).hexdigest()}\n')
     print(f'PASS editor: {a.case} ({a.width}x{a.height}), GPT/FAT persistence verified')

@@ -19,6 +19,7 @@ pub struct Draft {
     pub default: String,
     pub timeout: String,
     pub theme: String,
+    pub language: String,
 }
 impl From<&Config> for Draft {
     fn from(c: &Config) -> Self {
@@ -39,6 +40,7 @@ impl From<&Config> for Draft {
             default: c.entries()[c.default_index()].id().into(),
             timeout: format!("{}", c.timeout()),
             theme: c.theme().into(),
+            language: c.language().into(),
         }
     }
 }
@@ -97,9 +99,10 @@ impl Draft {
             .parse()
             .map_err(|_| String::from("Timeout must be an integer in 0..3600"))?;
         let mut s = format!(
-            "# Saved by EutherBoot. Previous file is preserved in .bak.\n[boot]\ndefault = {}\ntimeout = {timeout}\ntheme = {}\n",
+            "# Saved by EutherBoot. Previous file is preserved in .bak.\n[boot]\ndefault = {}\ntimeout = {timeout}\ntheme = {}\nlanguage = {}\n",
             quote(&self.default),
-            quote(&self.theme)
+            quote(&self.theme),
+            quote(&self.language)
         );
         for e in &self.entries {
             s.push_str(&format!(

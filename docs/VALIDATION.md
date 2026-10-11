@@ -559,3 +559,19 @@ the assertion still requires an actual framebuffer change. Screenshots of the
 final countdown and embedded emblem were visually inspected at both resolutions.
 The independent deadline remains authoritative if display ticks are delayed.
 No physical UI or autoboot test, USB write, or internal installation occurred.
+
+## Grafisk editor och rescue-leverans 2026-10-11
+
+- 31 boot-core-tester godkända; normal- och felinjektionsbygge godkända.
+- Tio editorfall godkända i QEMU: appearance och save vid 1024×768/640×480,
+  discard, readonly, invalid samt avbrott efter stage/backup/install.
+- Appearance provar språk/teman, svenska namn, förhandsvisning, avbrytning och
+  beständig konfiguration efter omstart. Bildkontrollen väntar på färdigrenderad
+  palett; ett första 1024-test läste föregående bild för tidigt och kördes om.
+- Huvudmenyns sample (640×480), countdown och cancel (1024×768) godkända.
+- Evidens: `artifacts/editor-validation/{result,menu-result}.json`, fallens
+  loggar och EFI-hash i respektive result.txt. Lågupplöst editor granskad visuellt.
+- Fysiskt UEFI-tangentbord med svenska tecken och ny grafik återstår.
+- Rescue-USB skrivet och fsync slutförd. Full återläsning uttryckligen bortvald
+  av användaren; GPT jämförd och partitioner monterade. Fysisk start återstår.
+  Rescue innehåller den äldre källsnapshoten 17e20d9, inte den nya editorn.

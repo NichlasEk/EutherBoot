@@ -1,5 +1,5 @@
 //! Keyboard editor: inspection -> isolated draft -> preview -> confirmed save.
-use crate::{config, graphics, storage::UefiStore, trace};
+use crate::{config, graphics, storage::UefiStore, trace, ui};
 use alloc::{format, string::String, vec::Vec};
 use boot_core::{
     config::MAX_ENTRIES,
@@ -23,30 +23,45 @@ fn clipped(s: &str, n: usize) -> String {
     s.chars().take(n).collect()
 }
 fn confirm(title: &str, details: &str) -> bool {
-    clear();
-    uefi::println!(
-        "EUTHERBOOT / CONFIRM\n\n{title}\n\n{details}\n\nY confirms. Any other key cancels."
+    let title = ui::tr(title);
+    let details = ui::tr(details);
+    let lines: Vec<&str> = details.lines().collect();
+    let footer = ui::choose(
+        "Y confirms. Any other key cancels.",
+        "Y bekräftar. Valfri annan tangent avbryter.",
     );
+    if graphics::sheet(title, &lines, footer).is_err() {
+        clear();
+        uefi::println!("{title}\n\n{details}\n\n{footer}");
+    }
     trace("EDITOR_CONFIRM");
     matches!(key(),Some(Key::Printable(c)) if matches!(char::from(c),'y'|'Y'))
 }
 fn prompt(field: &str, initial: &str, max: usize) -> Option<String> {
     let mut value = String::from(initial);
     loop {
-        clear();
-        uefi::println!(
-            "EUTHERBOOT / DRAFT FIELD\n\n{field}\n\n{}\n\n{} / {} characters\nEnter accepts | F4 clears | Esc cancels",
-            value
-                .chars()
-                .rev()
-                .take(65)
-                .collect::<Vec<_>>()
-                .into_iter()
-                .rev()
-                .collect::<String>(),
-            value.len(),
-            max
+        let display: String = value
+            .chars()
+            .rev()
+            .take(100)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect();
+        let count = format!(
+            "{} / {} {}",
+            value.chars().count(),
+            max,
+            ui::choose("characters", "tecken")
         );
+        let footer = ui::choose(
+            "Enter Accept   Backspace Delete   F4 Clear   Esc Cancel",
+            "Enter Godkänn   Backsteg Radera   F4 Töm   Esc Avbryt",
+        );
+        if graphics::sheet(ui::tr(field), &[&display, "", &count], footer).is_err() {
+            clear();
+            uefi::println!("{}\n\n{display}\n\n{count}\n{footer}", ui::tr(field));
+        }
         trace(&format!("PROMPT_READY {field}"));
         match key()? {
             Key::Special(ScanCode::ESCAPE) => return None,
@@ -56,7 +71,14 @@ fn prompt(field: &str, initial: &str, max: usize) -> Option<String> {
                 '\u{8}' => {
                     value.pop();
                 }
-                c if c.is_ascii() && !c.is_control() && value.len() < max => value.push(c),
+                c if (if field == "name" {
+                    boot_core::presentation::display_char(c)
+                } else {
+                    c.is_ascii() && !c.is_control()
+                }) && value.chars().count() < max =>
+                {
+                    value.push(c)
+                }
                 _ => {}
             },
             _ => {}
@@ -65,21 +87,40 @@ fn prompt(field: &str, initial: &str, max: usize) -> Option<String> {
     }
 }
 fn show(draft: Option<&Draft>, selected: usize, editing: bool, message: &str) {
+    if let Some(d) = draft {
+        ui::configure(&d.theme, &d.language);
+    }
+    if graphics::editor(draft, selected, editing, message).is_ok() {
+        trace("EDITOR_READY");
+        return;
+    }
     clear();
     uefi::println!(
-        "EUTHERBOOT / CONFIGURATION\n{}\n",
+        "EUTHERBOOT / {}\n{}\n",
+        ui::choose("CONFIGURATION", "INSTÄLLNINGAR"),
         if editing {
-            "DRAFT - edits require explicit Save"
+            ui::choose(
+                "DRAFT - edits require explicit Save",
+                "UTKAST - ändringar kräver Spara",
+            )
         } else {
-            "READ ONLY - E starts a separate draft"
+            ui::choose(
+                "READ ONLY - E starts a separate draft",
+                "ENDAST LÄSNING - E skapar ett utkast",
+            )
         }
     );
     if let Some(d) = draft {
         uefi::println!(
-            "Default: {}  Timeout: {}s  Appearance: {}\n",
+            "{}: {}  {}: {}s  {}: {}  {}: {}\n",
+            ui::choose("Default", "Förval"),
             d.default,
+            ui::choose("Timeout", "Väntetid"),
             d.timeout,
-            d.theme
+            ui::choose("Theme", "Tema"),
+            d.theme,
+            ui::choose("Language", "Språk"),
+            d.language
         );
         let first = selected / 5 * 5;
         for (i, e) in d.entries.iter().enumerate().skip(first).take(5) {
@@ -93,66 +134,97 @@ fn show(draft: Option<&Draft>, selected: usize, editing: bool, message: &str) {
         }
         if let Some(e) = d.entries.get(selected) {
             uefi::println!(
-                "\nPath: {}\nType: {} | Partition: {}",
+                "\n{}: {}\n{}: {} | Partition: {}",
+                ui::choose("Path", "Sökväg"),
                 e.path,
+                ui::choose("Type", "Typ"),
                 e.kind,
                 if e.partition_guid.is_empty() {
-                    "own volume"
+                    ui::choose("own volume", "egen volym")
                 } else {
                     &e.partition_guid
                 }
             );
         }
     } else {
-        uefi::println!("No valid live configuration. Recovery or external repair required.");
+        uefi::println!(
+            "{}",
+            ui::choose(
+                "No valid live configuration. Recovery or external repair required.",
+                "Ingen giltig konfiguration. Återställ eller reparera externt."
+            )
+        );
     }
     if editing {
         uefi::println!(
-            "\nD default | T timeout | G appearance | A add | R remove\nN name | P path | U partition | I import | V validate\nK type | C cmdline | J initrd | F6 details\nF5 preview | S save | Esc discard"
+            "{}",
+            ui::choose(
+                "D default | T timeout | G theme | L language | A add | R remove\nN name | P path | U partition | I import | V validate\nK type | C cmdline | J initrd | F6 details\nF5 preview | S save | Esc discard | F2 graphics",
+                "D förval | T väntetid | G tema | L språk | A lägg till | R ta bort\nN namn | P sökväg | U partition | I import | V kontrollera\nK typ | C kommandorad | J initrd | F6 detaljer\nF5 visa | S spara | Esc kasta | F2 grafik"
+            )
         );
     } else {
         uefi::println!(
-            "\nE edit | B restore backup | C keep current / clear pending save\nF6 entry details | Esc returns to boot menu"
+            "{}",
+            ui::choose(
+                "E edit | B restore backup | C keep current / clear pending save\nF6 entry details | F2 graphics | Esc boot menu",
+                "E ändra | B återställ backup | C behåll nuvarande / rensa ofärdigt sparande\nF6 detaljer | F2 grafik | Esc startmeny"
+            )
         );
     }
-    uefi::println!("\n{}", clipped(message, 160));
+    uefi::println!("\n{}", clipped(ui::tr(message), 160));
     trace("EDITOR_READY");
 }
 fn details(e: &DraftEntry) {
     let content = format!(
-        "Name: {}\nType: {}\nPartition: {}\nPath: {}\nCmdline: {}\nInitrd: {}",
+        "{}: {}\n{}: {}\nPartition: {}\n{}: {}\n{}: {}\nInitrd: {}",
+        ui::choose("Name", "Namn"),
         e.name,
+        ui::choose("Type", "Typ"),
         e.kind,
         if e.partition_guid.is_empty() {
-            "own volume"
+            ui::choose("own volume", "egen volym")
         } else {
             &e.partition_guid
         },
+        ui::choose("Path", "Sökväg"),
         e.path,
+        ui::choose("Cmdline", "Kommandorad"),
         e.cmdline,
         e.initrd
     );
     let mut lines = Vec::new();
     for line in content.lines() {
-        for part in line.as_bytes().chunks(64) {
-            lines.push(core::str::from_utf8(part).unwrap_or("?"));
+        for part in line.chars().collect::<Vec<_>>().chunks(58) {
+            lines.push(part.iter().collect::<String>());
         }
     }
     let mut page = 0;
     loop {
-        clear();
-        uefi::println!("EUTHERBOOT / ENTRY DETAILS (read-only)\n");
-        for line in lines.iter().skip(page * 12).take(12) {
-            uefi::println!("{line}");
-        }
-        uefi::println!(
-            "\nPage {} / {}   Up/Down: page   Esc: back",
+        let page_lines: Vec<&str> = lines
+            .iter()
+            .skip(page * 10)
+            .take(10)
+            .map(|s| s.as_str())
+            .collect();
+        let footer = format!(
+            "{} / {}   {}",
             page + 1,
-            lines.len().div_ceil(12)
+            lines.len().div_ceil(10),
+            ui::choose("Up/Down Page   Esc Back", "Upp/Ned Sida   Esc Tillbaka")
         );
+        let title = ui::choose("Entry details", "Postens detaljer");
+        if graphics::sheet(title, &page_lines, &footer).is_err() {
+            clear();
+            uefi::println!("{title}\n");
+            for line in &page_lines {
+                uefi::println!("{line}");
+            }
+            uefi::println!("{footer}");
+        }
         trace("EDITOR_DETAILS");
         match key() {
-            Some(Key::Special(ScanCode::DOWN)) if (page + 1) * 12 < lines.len() => page += 1,
+            Some(Key::Special(ScanCode::DOWN)) if (page + 1) * 10 < lines.len() => page += 1,
             Some(Key::Special(ScanCode::UP)) if page > 0 => page -= 1,
             None | Some(Key::Special(ScanCode::ESCAPE)) => return,
             _ => {}
@@ -160,6 +232,7 @@ fn details(e: &DraftEntry) {
     }
 }
 fn preview(d: &Draft) -> Result<(), String> {
+    ui::configure(&d.theme, &d.language);
     let document = d.document()?;
     let c = config::validate(document.as_bytes())?;
     let mut labels: Vec<&str> = c.entries().iter().map(|e| e.name()).collect();
@@ -169,7 +242,10 @@ fn preview(d: &Draft) -> Result<(), String> {
         || graphics::draw(
             &labels,
             c.default_index(),
-            "UNSAVED PREVIEW - any key returns; nothing will boot.",
+            ui::choose(
+                "UNSAVED PREVIEW - any key returns; nothing will boot.",
+                "OSPARAD VISNING - valfri tangent återgår; ingenting startas.",
+            ),
         )
         .is_err()
     {
@@ -256,6 +332,9 @@ pub fn run_import(import: Option<crate::discovery::Selection>) -> bool {
                     }
                 }
             }
+            Key::Special(ScanCode::FUNCTION_2) => {
+                ui::toggle_fallback();
+            }
             Key::Special(ScanCode::FUNCTION_6) => {
                 if let Some(e) = draft.as_ref().and_then(|d| d.entries.get(selected)) {
                     details(e);
@@ -304,10 +383,18 @@ pub fn run_import(import: Option<crate::discovery::Selection>) -> bool {
                                 Ok(bytes) => {
                                     let c = config::validate(&bytes).unwrap();
                                     let detail = format!(
-                                        "Use {name}: {} entries, default {}, timeout {}s.\nPending staged data will be discarded. No EFI application is changed.",
+                                        "{} {name}: {} {}, {} {}, {} {}s.\n{}",
+                                        ui::choose("Use", "Använd"),
                                         c.entries().len(),
+                                        ui::choose("entries", "poster"),
+                                        ui::choose("default", "förval"),
                                         c.entries()[c.default_index()].id(),
-                                        c.timeout()
+                                        ui::choose("timeout", "väntetid"),
+                                        c.timeout(),
+                                        ui::choose(
+                                            "Pending staged data will be discarded. No EFI application is changed.",
+                                            "Ofärdigt sparande rensas. Inget EFI-program ändras."
+                                        )
                                     );
                                     if confirm(
                                         if ch == 'b' {
@@ -355,12 +442,12 @@ pub fn run_import(import: Option<crate::discovery::Selection>) -> bool {
                         }
                     }
                     'g' => {
-                        d.theme = if d.theme == "text" {
-                            "system-regis"
-                        } else {
-                            "text"
-                        }
-                        .into();
+                        let themes = boot_core::presentation::THEMES;
+                        let index = themes.iter().position(|t| *t == d.theme).unwrap_or(0);
+                        d.theme = themes[(index + 1) % themes.len()].into();
+                    }
+                    'l' => {
+                        d.language = if d.language == "sv" { "en" } else { "sv" }.into();
                     }
                     'a' => {
                         if d.entries.len() >= MAX_ENTRIES {
@@ -389,8 +476,13 @@ pub fn run_import(import: Option<crate::discovery::Selection>) -> bool {
                             if confirm(
                                 "Remove this entry from the draft?",
                                 &format!(
-                                    "{} | {}\nA removed default must be replaced explicitly with D.",
-                                    e.id, e.name
+                                    "{} | {}\n{}",
+                                    e.id,
+                                    e.name,
+                                    ui::choose(
+                                        "A removed default must be replaced explicitly with D.",
+                                        "Ett borttaget förval måste ersättas uttryckligen med D."
+                                    )
                                 ),
                             ) {
                                 d.entries.remove(selected);

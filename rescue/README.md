@@ -72,3 +72,13 @@ diskar. Den autentiserade Codex-sessionen och fysisk USB-start återstår.
 
 ISO SHA-256:
 `a5aa2d5f4f4b1ec63ae72a16e0bd52f9645f37327543c6c304328ba2a75c3890`.
+
+## Fysisk skrivning 2026-10-11
+
+General UDisk har skrivits och synkats. Full återläsning hoppades över efter
+uttrycklig begäran; partitionstabellens båda kopior jämfördes mot avbilden och
+EFI-/datapartitionerna monterades. Detta ersätter inte en full bytejämförelse.
+Leveransresultat finns privat i `artifacts/rescue/usb-delivery.json`.
+Startfilen är osignerad: använd UEFI med Secure Boot avstängt för denna utgåva.
+Fysiskt starttest och autentiserad Codex-session återstår. Källsnapshoten är
+`17e20d9`; senare editorändringar finns ännu inte på stickan.

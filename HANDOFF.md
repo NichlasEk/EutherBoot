@@ -32,6 +32,23 @@ och efter lyckad fysisk skrivning `usb-delivery.json`. Läs dessa före nya
 Den medföljande källkopian i ISO:n är en snapshot av `17e20d9`; dess HANDOFF
 beskriver det äldre fysiska testet, inte den nya rescue-leveransen.
 
+## Aktuell leverans och editor
+
+Rescue-stickan är färdigskriven och fsync slutförd. Full återläsning hoppades
+över på användarens uttryckliga begäran. GPT i båda ändar matchade avbilden,
+EFI-filer kontrollerades och EFI-/datapartitionerna monterades. Se lokal
+`artifacts/rescue/usb-delivery.json`. Fysisk start och autentiserad Codex återstår.
+Stickan är osignerad; första testet kräver UEFI med Secure Boot avstängt.
+Interna `/boot` har verifierats oförändrat mot tidigare 366 filhashar.
+
+Grafisk editor, svenska namn/texter och tre grafiska paletter plus textläge
+är implementerade. G byter tema, L språk; F2 ger tillfällig textreserv.
+Se [editorbeskrivningen](docs/design/EDITOR.md). Rescue-avbildens källsnapshot
+är fortfarande `17e20d9` och innehåller inte dessa senare editorändringar.
+Användaren testar stickan på en annan dator medan en modell laddas ned här:
+starta inte om värddatorn. Nästa prioriteringar finns i
+[rEFInd-genomgången](docs/REFIND-REVIEW.md).
+
 ## Börja här efter omstart
 
 1. Läs aktuell rescue-status nedan. Den gamla 0.1.1-leveransen är historik. Arbeta i `/run/media/nichlas/Kingston1TB/EutherBoot`.

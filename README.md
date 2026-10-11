@@ -48,8 +48,8 @@ Secure Boot test tools and guest package downloads. Evidence is written under
 The System Regis graphical menu uses navy panels, gold selection, a steel-sword/three-crown
 emblem and embedded antialiased serif/body text. Configured entries appear as
 paginated icon cards, with configuration and firmware-return actions below.
-Entry-name icons are visual hints, not OS detection. F4 and the editor currently
-retain text interfaces. Glyph attribution and regeneration details are in
+Entry-name icons are visual hints, not OS detection. The editor uses the same graphical style, with text fallback; F4 currently
+retains its text interface. Glyph attribution and regeneration details are in
 [the font asset notes](crates/uefi-app/assets/fonts/README.md).
 
 ## Build and run
@@ -161,11 +161,11 @@ appears in text mode with read-only inspection and return-to-firmware available.
 The host checker cannot verify firmware-specific self-reference or file existence.
 
 Current bounds: 16 KiB input, 1..16 EFI entries, IDs of 1..32 ASCII letters,
-digits, `-` or `_`, printable ASCII names of 1..48 characters, and ASCII paths
+digits, `-` or `_`, names of 1..48 supported characters (ASCII and ÅÄÖåäöÉé), and ASCII paths
 up to 240 bytes. Paths must start with `\EFI\`, end in `.efi`, and cannot use
 traversal, empty components, whitespace, wildcards or short-name `~` aliases.
 These restrictions make the initial graphical renderer/path handling explicit.
-Unicode entry names, additional themes and `type = "firmware"` are **not implemented**;
+Other Unicode characters and `type = "firmware"` are **not implemented**;
 unsupported values produce errors. The built-in firmware-return action simply
 returns to the caller; it does not open firmware settings or change BootOrder.
 
@@ -414,7 +414,9 @@ Press **E** to begin a separate draft. Up/Down selects the entry to edit.
 | --- | --- |
 | D | Make the selected entry the default |
 | T | Enter timeout in seconds |
-| G | Toggle System Regis graphics / text appearance |
+| G | Cycle System Regis, text, light and high-contrast themes |
+| L | Switch English / Swedish UI in the draft |
+| F2 | Toggle temporary text fallback when a graphical theme is selected |
 | A | Add an entry by ID, name and EFI path |
 | R | Remove the selected entry after confirmation |
 | N / P | Change the selected entry's name / path |
@@ -427,6 +429,17 @@ Press **E** to begin a separate draft. Up/Down selects the entry to edit.
 | F5 | Preview without booting or changing the live configuration |
 | S | Validate and open a save confirmation; only Y writes |
 | Escape | Confirm discarding the draft and return to the menu |
+
+The graphical editor includes inspection, prompts, details, preview and confirmation
+screens. It adapts to 640×480 and larger modes. A draft's appearance/language
+changes are previewed immediately; discarding restores the saved appearance.
+`boot.language` accepts `en` (default for existing files) or `sv`. `boot.theme`
+accepts `system-regis`, `text`, `system-regis-light` or `high-contrast`.
+Swedish display names and editor text are supported; technical parser/storage
+errors retain English diagnostics. Physical Swedish keyboard input depends on
+firmware and remains to be tested. This is separate from rescue Linux's Swedish
+keyboard layout. Saving with the new language/theme schema requires this newer
+EutherBoot build; retain the matching backup when using an older executable.
 
 Field prompts accept Enter, Backspace, F4 to clear and Escape to cancel. Removing
 the default does not silently select another entry: choose a replacement with D.

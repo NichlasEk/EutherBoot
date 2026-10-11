@@ -15,6 +15,7 @@ pub struct Config {
     default_index: usize,
     timeout: u16,
     theme: String,
+    language: String,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EntryKind {
@@ -72,6 +73,9 @@ impl Config {
     pub fn theme(&self) -> &str {
         &self.theme
     }
+    pub fn language(&self) -> &str {
+        &self.language
+    }
     pub fn timeout(&self) -> u16 {
         self.timeout
     }
@@ -90,6 +94,11 @@ struct RawBoot {
     timeout: u16,
     #[serde(default = "theme")]
     theme: String,
+    #[serde(default = "language")]
+    language: String,
+}
+fn language() -> String {
+    "en".into()
 }
 fn theme() -> String {
     "system-regis".into()
@@ -170,8 +179,13 @@ pub fn parse(source: &str) -> Result<Config, String> {
     if raw.boot.timeout > 3600 {
         return Err("boot.timeout must be 0..3600 seconds".into());
     }
-    if !matches!(raw.boot.theme.as_str(), "system-regis" | "text") {
-        return Err("boot.theme: expected system-regis or text".into());
+    if !crate::presentation::THEMES.contains(&raw.boot.theme.as_str()) {
+        return Err(
+            "boot.theme: expected system-regis, system-regis-light, high-contrast or text".into(),
+        );
+    }
+    if !matches!(raw.boot.language.as_str(), "en" | "sv") {
+        return Err("boot.language: expected en or sv".into());
     }
     if raw.entry.is_empty() || raw.entry.len() > MAX_ENTRIES {
         return Err("Expected 1..16 EFI entries".into());
@@ -189,10 +203,12 @@ pub fn parse(source: &str) -> Result<Config, String> {
             return Err(fail("id must be 1..32 ASCII letters, digits, '-' or '_'"));
         }
         if e.name.trim().is_empty()
-            || e.name.len() > 48
-            || !e.name.bytes().all(|b| (32..=126).contains(&b))
+            || e.name.chars().count() > 48
+            || !e.name.chars().all(crate::presentation::display_char)
         {
-            return Err(fail("name must be 1..48 printable ASCII characters"));
+            return Err(fail(
+                "name must be 1..48 supported display characters (ASCII, ÅÄÖåäöÉé)",
+            ));
         }
         let kind = match e.kind.as_str() {
             "efi" => {
@@ -253,6 +269,7 @@ pub fn parse(source: &str) -> Result<Config, String> {
         default_index,
         timeout: raw.boot.timeout,
         theme: raw.boot.theme,
+        language: raw.boot.language,
     })
 }
 
@@ -389,8 +406,29 @@ mod tests {
     }
     #[test]
     fn display_controls_and_unicode_rejected() {
-        for name in ["", "å", "\\u001b[2J", "\\n", &"x".repeat(49)] {
+        for name in ["", "中", "\\u001b[2J", "\\n", &"x".repeat(49)] {
             assert!(parse(&BASE.replace("EFI test application", name)).is_err());
         }
+    }
+    #[test]
+    fn swedish_names_and_preferences_roundtrip() {
+        for theme in crate::presentation::THEMES {
+            let source = BASE
+                .replace("EFI test application", "Räddningsmiljö ÅÄÖåäö")
+                .replace(
+                    "theme = \"system-regis\"",
+                    &format!("theme = {theme:?}\nlanguage = \"sv\""),
+                );
+            let c = parse(&source).unwrap();
+            assert_eq!(c.language(), "sv");
+            assert_eq!(c.theme(), *theme);
+            assert_eq!(c.entries()[0].name(), "Räddningsmiljö ÅÄÖåäö");
+            let document = crate::draft::Draft::from(&c).document().unwrap();
+            assert_eq!(parse(&document).unwrap().language(), "sv");
+        }
+        assert!(parse(&BASE.replace("EFI test application", &"å".repeat(48))).is_ok());
+        assert!(parse(&BASE.replace("EFI test application", &"å".repeat(49))).is_err());
+        assert_eq!(parse(BASE).unwrap().language(), "en");
+        assert!(parse(&BASE.replace("[boot]", "[boot]\nlanguage='xx'")).is_err());
     }
 }

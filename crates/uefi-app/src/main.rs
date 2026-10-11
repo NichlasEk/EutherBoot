@@ -15,6 +15,7 @@ mod linux;
 mod loader;
 mod storage;
 mod timeout;
+mod ui;
 mod volumes;
 use alloc::{format, string::String, vec::Vec};
 use boot_core::Menu;
@@ -91,10 +92,18 @@ fn session(allow_timeout: bool) -> Option<Status> {
             (None, Some(e))
         }
     };
+    ui::reset_fallback();
+    ui::configure(
+        config.as_ref().map(|c| c.theme()).unwrap_or("system-regis"),
+        config.as_ref().map(|c| c.language()).unwrap_or("en"),
+    );
     let entries = config.as_ref().map(|c| c.entries()).unwrap_or(&[]);
     let mut labels: Vec<&str> = entries.iter().map(|e| e.name()).collect();
-    labels.push("Configuration (read-only)");
-    labels.push("Return to firmware");
+    labels.push(ui::choose(
+        "Configuration (read-only)",
+        "Inställningar (läsning)",
+    ));
+    labels.push(ui::choose("Return to firmware", "Tillbaka till firmware"));
     let mut menu = Menu {
         selected: config.as_ref().map(|c| c.default_index()).unwrap_or(0),
     };
@@ -116,9 +125,16 @@ fn session(allow_timeout: bool) -> Option<Status> {
     let default_unavailable = target_diagnostic.is_some();
     let mut notice = diagnostic.clone().or(target_diagnostic).unwrap_or_else(|| {
         if seconds == 0 || !allow_timeout {
-            String::from("No automatic boot. Select an entry and press Enter.")
+            String::from(ui::choose(
+                "No automatic boot. Select an entry and press Enter.",
+                "Ingen automatisk start. Välj en post och tryck Enter.",
+            ))
         } else {
-            format!("Starting in {seconds}s. Any key cancels.")
+            format!(
+                "{} {seconds}s. {}",
+                ui::choose("Starting in", "Startar om"),
+                ui::choose("Any key cancels.", "Valfri tangent avbryter.")
+            )
         }
     });
     let mut text = render(
@@ -162,7 +178,8 @@ fn session(allow_timeout: bool) -> Option<Status> {
             // Input wins if both keyboard and timer are ready in this poll.
             if timer.take().is_some() {
                 trace("TIMEOUT_CANCELLED");
-                notice = "Automatic boot cancelled.".into();
+                notice =
+                    ui::choose("Automatic boot cancelled.", "Automatisk start avbruten.").into();
                 redraw = true;
             }
             match key {
@@ -184,6 +201,11 @@ fn session(allow_timeout: bool) -> Option<Status> {
                             return None;
                         }
                     }
+                    ui::reset_fallback();
+                    ui::configure(
+                        config.as_ref().map(|c| c.theme()).unwrap_or("system-regis"),
+                        config.as_ref().map(|c| c.language()).unwrap_or("en"),
+                    );
                     notice = "Discovery closed. Automatic boot disabled.".into();
                     redraw = true;
                 }
@@ -191,7 +213,16 @@ fn session(allow_timeout: bool) -> Option<Status> {
                     if editor::run() {
                         return None;
                     }
-                    notice = "Editor closed. Configuration unchanged.".into();
+                    ui::reset_fallback();
+                    ui::configure(
+                        config.as_ref().map(|c| c.theme()).unwrap_or("system-regis"),
+                        config.as_ref().map(|c| c.language()).unwrap_or("en"),
+                    );
+                    notice = ui::choose(
+                        "Editor closed. Configuration unchanged.",
+                        "Editorn stängd. Inställningarna är oförändrade.",
+                    )
+                    .into();
                     redraw = true;
                 }
                 Key::Special(ScanCode::FUNCTION_2) => {
@@ -210,7 +241,11 @@ fn session(allow_timeout: bool) -> Option<Status> {
                 }
                 Ok(false) => match t.countdown() {
                     Ok(Some(remaining)) => {
-                        notice = format!("Starting in {remaining}s. Any key cancels.");
+                        notice = format!(
+                            "{} {remaining}s. {}",
+                            ui::choose("Starting in", "Startar om"),
+                            ui::choose("Any key cancels.", "Valfri tangent avbryter.")
+                        );
                         countdown_changed = Some(remaining);
                         redraw = true;
                     }

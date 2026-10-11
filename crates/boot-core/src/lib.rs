@@ -5,6 +5,7 @@ pub mod discovery;
 pub mod draft;
 pub mod gpt;
 pub mod linux;
+pub mod presentation;
 pub mod transaction;
 
 /// Bounded selection: navigation never activates an entry.
