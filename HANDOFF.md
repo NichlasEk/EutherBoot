@@ -1,6 +1,6 @@
 # EutherBoot – handoff inför första fysiska USB-testet
 
-Uppdaterad 2026-10-10. **Fysisk EutherBoot-meny demonstrerad; GRUB-start blockerad av partitionsidentifieringen.**
+Uppdaterad 2026-10-11. **Fysisk EutherBoot-meny demonstrerad; GRUB-start blockerad av partitionsidentifieringen.**
 
 ## Uppdatering 0.1.1 inför andra försöket
 
@@ -15,6 +15,18 @@ inkluderar CRC-fel, trasiga längder, fel GUID/geometri, attribut och 4K-block.
 Fysisk orsak är fortfarande en hypotes tills nästa test. Ny release/USB-evidens
 läggs i `artifacts/host-probe-0.1.1/`; originalleveransen lämnas som historik.
 Tidigare stickfiler finns i `artifacts/host-probe/pre-gpt-update/`.
+
+**0.1.1 är nu levererad på General UDisk.** Kod och matchande källarkiv bygger
+på commit `8e205dd`. EFI och källarkiv skrevs via monterat FAT-filsystem med
+fsync, sedan avmonterades/återmonterades stickan skrivskyddat. SHA-256 på
+samtliga levererade filer stämmer. Konfigurationen och intern GRUB är oförändrade.
+Ingen partitions-/GPT-ändring gjordes vid denna uppdatering. Stickan är kvar vid
+`/run/media/nichlas/F911-7E73`. Identifiera den på nytt inför framtida skrivningar.
+
+EFI SHA-256: `82ac7c5f8b117a42812eeec6455be463749f44ddf15468696e5ce88c738c32ab`.
+Leveransevidens: `artifacts/host-probe-0.1.1/usb-delivery.json`.
+Exakt releaseavbild testades i QEMU med separat virtuell mål-ESP före kopiering.
+Äldre hel-ESP-hash längre ned gäller endast första leveransen, inte 0.1.1.
 
 Nästa test: välj USB → kontrollera **0.1.1** → **F4** och fotografera hela
 sökresultatet → Esc → Existing boot loader. GRUB/Arch via den nya versionen
