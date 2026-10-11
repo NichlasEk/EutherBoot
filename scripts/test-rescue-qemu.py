@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import argparse,hashlib,json,os,shutil,socket,subprocess,tempfile,threading,time
 from guest_console import drain,wait,command
 ROOT=Path(__file__).resolve().parents[1]
-out=ROOT/'artifacts/rescue';iso=out/'euther-rescue-0.1.0-x86_64.iso'
+out=ROOT/'artifacts/rescue';iso=out/'euther-rescue-0.1.1-x86_64.iso'
 parser=argparse.ArgumentParser();parser.add_argument('--usb-image',type=Path);options=parser.parse_args()
 assert iso.is_file()
 results=[]

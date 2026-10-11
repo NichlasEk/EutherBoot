@@ -46,7 +46,7 @@ p.write_text(s)
 iso_label="EUTHER_RESCUE"
 iso_publisher="EutherBoot"
 iso_application="System Regis Arch Rescue"
-iso_version="0.1.0"
+iso_version="0.1.1"
 install_dir="arch"
 bootmodes=('uefi.systemd-boot')
 pacman_conf="pacman.conf"

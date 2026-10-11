@@ -4,7 +4,7 @@ from pathlib import Path
 from types import SimpleNamespace
 import argparse,hashlib,json,os,shlex,shutil,socket,subprocess,threading,time
 from guest_console import drain,wait,command
-parser=argparse.ArgumentParser();parser.add_argument('--resume',action='store_true');parser.add_argument('--reuse-transfer',action='store_true');args_cli=parser.parse_args()
+parser=argparse.ArgumentParser();parser.add_argument('--resume',action='store_true');parser.add_argument('--reuse-transfer',action='store_true');parser.add_argument('--fresh-work',action='store_true');args_cli=parser.parse_args()
 ROOT=Path(__file__).resolve().parents[1]
 out=ROOT/'artifacts/rescue';out.mkdir(exist_ok=True)
 manifest=json.loads((ROOT/'artifacts/arch/manifest.json').read_text())
@@ -51,13 +51,14 @@ with (base/'qemu.log').open('w') as err:
             command(v,serial,'sudo mkdir -p /transfer; sudo mount -o uid=1000,gid=1000 /dev/vdb /transfer; sudo mkdir -p /build; sudo rm -rf /build/profile; sudo tar -xzf /transfer/profile.tar.gz -C /build')
             print('Guest booted; upgrading build tools inside disposable overlay',flush=True)
             if not args_cli.resume:command(v,serial,"sudo pacman -Syu --noconfirm archiso",timeout=1800)
+            if args_cli.fresh_work:command(v,serial,'sudo rm -rf /build/work')
             print('Building rescue ISO inside guest',flush=True)
             command(v,serial,'sudo mkarchiso -v -w /build/work -o /transfer /build/profile 2>&1 | tee /transfer/mkarchiso.log',timeout=3600)
             command(v,serial,'sudo cp /build/work/iso/arch/pkglist.x86_64.txt /transfer/; sync')
             serial.sendall(b'sudo systemctl poweroff\n');proc.wait(timeout=60)
-        subprocess.run(['mcopy','-o','-i',str(disk),'::/euther-rescue-0.1.0-x86_64.iso',str(out/'euther-rescue-0.1.0-x86_64.iso')],check=True)
+        subprocess.run(['mcopy','-o','-i',str(disk),'::/euther-rescue-0.1.1-x86_64.iso',str(out/'euther-rescue-0.1.1-x86_64.iso')],check=True)
         subprocess.run(['mcopy','-o','-i',str(disk),'::/mkarchiso.log',str(out/'mkarchiso.log')],check=True)
-        result={'iso':str(out/'euther-rescue-0.1.0-x86_64.iso'),'sha256':sha(out/'euther-rescue-0.1.0-x86_64.iso'),'source_image_unchanged':sha(image)==manifest['image_sha256'],'host_disks_attached':False,'network':'QEMU NAT, no port forwarding','builder':'disposable official Arch qcow2 overlay'}
+        result={'iso':str(out/'euther-rescue-0.1.1-x86_64.iso'),'sha256':sha(out/'euther-rescue-0.1.1-x86_64.iso'),'source_image_unchanged':sha(image)==manifest['image_sha256'],'host_disks_attached':False,'network':'QEMU NAT, no port forwarding','builder':'disposable official Arch qcow2 overlay'}
         (out/'build-result.json').write_text(json.dumps(result,indent=2)+'\n')
         print(json.dumps(result),flush=True)
     finally:

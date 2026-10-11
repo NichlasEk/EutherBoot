@@ -7,8 +7,8 @@ from types import SimpleNamespace
 import argparse,hashlib,json,os,shutil,socket,subprocess,tempfile,threading,time
 from guest_console import drain,wait,command
 ROOT=Path(__file__).resolve().parents[1]
-out=ROOT/'artifacts/rescue';iso=out/'euther-rescue-0.1.0-x86_64.iso'
-parser=argparse.ArgumentParser();parser.add_argument('--usb-image',type=Path);options=parser.parse_args()
+out=ROOT/'artifacts/rescue';iso=out/'euther-rescue-0.1.1-x86_64.iso'
+parser=argparse.ArgumentParser();parser.add_argument('--usb-image',type=Path);parser.add_argument('--installed-launchers',action='store_true');options=parser.parse_args()
 assert iso.is_file()
 results=[]
 with tempfile.TemporaryDirectory(prefix='euther-rescue-test-') as directory:
@@ -48,6 +48,10 @@ with tempfile.TemporaryDirectory(prefix='euther-rescue-test-') as directory:
                         (ROOT/'scripts/rescue-codex-smoke.py','/tmp/probe.py'),
                         (ROOT/'rescue/overlay/usr/local/bin/codex','/usr/local/bin/codex'),
                         (ROOT/'rescue/overlay/usr/local/bin/rescue-start','/usr/local/bin/rescue-start')]:
+                        if options.installed_launchers and destination.startswith('/usr/local/bin/'):
+                            expected=hashlib.sha256(source.read_bytes()).hexdigest()
+                            command(v,serial,f'test \"$(sha256sum {destination} | cut -d \" \" -f1)\" = {expected}')
+                            continue
                         data=base64.b64encode(source.read_bytes()).decode()
                         command(v,serial,": > /tmp/transfer.b64")
                         for start in range(0,len(data),1000):
@@ -72,7 +76,7 @@ df -h /
                                 response=json.loads(stream.readline())
                                 if 'error' in response:raise RuntimeError(response)
                                 if 'return' in response:break
-                    results.append({'boot':iteration,'onboarding_reached':True,'state_mode':'700','daemon_installed':False,'authenticated_session':False,'launchers_injected':True})
+                    results.append({'boot':iteration,'onboarding_reached':True,'state_mode':'700','daemon_installed':False,'authenticated_session':False,'launchers_injected':not options.installed_launchers})
                     serial.sendall(b'sudo systemctl poweroff\n');proc.wait(timeout=60)
                 print(f'PASS rescue-start onboarding, fresh state and argument forwarding',flush=True)
             finally:
