@@ -204,3 +204,11 @@ Rescue 0.1.1 har byggts, QEMU-testats och levererats till General UDisk med
 korrigerad Codex-start och grafisk editor inkluderad. Nästa steg är fysisk
 Codex-inloggning/arbetsdata, sedan direktstart av installerat Arch. Värddatorn
 har inte startats om under bygget eller USB-leveransen.
+
+## Direktstartstest förberett
+
+Rescue-stickans fysiska start och Codex-inloggning är bekräftade av användaren.
+En separat Kingston DataTraveler har fått EutherBoot med normal/fallback-UKI
+för befintligt Arch samt GRUB som reservval. Avbilden är QEMU-testad och USB-
+leveransen verifierad; fysisk direktstart återstår. Se
+[DIRECT-ARCH-USB.md](docs/DIRECT-ARCH-USB.md). Ingen intern installation ännu.

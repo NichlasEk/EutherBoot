@@ -10,7 +10,47 @@ hittades. Ledigt: 438 767 616 byte (418,4 MiB). Gamla modulrester om cirka
 Se `docs/HOST-COMPATIBILITY.md` för utrymmesstatus.
 
 
-## Aktuell leverans: Euther Rescue 0.1.1
+## Nu: separat USB för direktstart av installerat Arch
+
+Användaren bekräftar att Euther Rescue 0.1.1 startar fysiskt och att Codex-
+inloggning fungerar från stickan. Rescue-stickan behålls intakt. En annan
+Kingston DataTraveler 3.0, cirka 31 GB, godkändes uttryckligen för överskrivning.
+Den nya teststickan är nu färdigskriven, synkad och verifierad; inte omstartad
+på den fysiska datorn ännu.
+
+**Nästa steg:** tillfällig UEFI-bootmeny → Kingston DataTraveler →
+**Arch Linux direkt**. Ingen automatisk start. När Arch är igång:
+
+```sh
+grep -o 'eutherboot_probe=[^ ]*' /proc/cmdline
+uname -r
+findmnt -no SOURCE,FSTYPE,FSROOT /
+```
+
+Förväntad markör: `eutherboot_probe=usb-direct-normal-v1`. Root ska fortfarande
+vara Btrfs `/@`. **Arch Linux reserv** använder aktuell fallback-initramfs;
+**Befintlig GRUB** går till den oförändrade interna EFI-startfilen.
+Secure Boot ska vara avstängt för denna osignerade testversion.
+
+Se [hela instruktionen](docs/DIRECT-ARCH-USB.md). Kärna 7.2.9-arch1-1 och
+normal/fallback-initramfs är kopierade från aktuella `/boot`, inte ombyggda.
+UKI-filerna ligger på USB; ingen intern installation eller pakethook har gjorts.
+Teststickan är en snapshot: återskapa den om kärna/moduler uppdateras före provet.
+
+QEMU verifierade båda verkliga UKI:erna till initramfs och det väntade stoppet
+för saknad root (inga interna diskar anslöts). GRUB-menypostens volymval och
+retur provades med en disponibel EFI-applikation. Fysisk Arch-inloggning via
+direktvalet återstår. Båda GPT-kopiorna och sex levererade filhashar verifierades;
+366 interna bootfilers hash är oförändrade. Ingen separat full återläsning.
+
+Artefakter: `artifacts/direct-probe/result.json`, `artifacts/direct-delivery/result.json`
+och `artifacts/direct-host-inventory/`. USB lämnades skrivskyddat monterat på
+`/run/media/nichlas/1DB6-0A6D`; mata ut via filhanteraren före omstart/flytt.
+Identifiera alltid stickan på nytt; det är inte rescue-stickans General UDisk.
+Den aktuella modellnedladdningen rapporterades klar, men ingen omstart av
+värddatorn har utförts av agenten.
+
+## Rescue-leverans: Euther Rescue 0.1.1
 
 ISO: `artifacts/rescue/euther-rescue-0.1.1-x86_64.iso`.
 SHA-256: `958f0a2614c80c6da17124743a4a613e9519e6c8aeaaa11038ed174c6c18e44b`.
@@ -28,9 +68,9 @@ Sex EFI-partitionsfiler, inklusive kärna och initramfs, hashjämfördes mot
 avbilden. EFI-/datapartitionerna monterades. Datapartitionen
 lämnades vid `/run/media/nichlas/EUTHERDATA`. Mata ut före fysisk flytt.
 
-Leveransresultat: `artifacts/rescue/usb-delivery.json`. Den nya utgåvan ska
-provas fysiskt: UEFI med Secure Boot avstängt, nätverk, `rescue-start`,
-Codex-inloggning och beständig arbetsdata. Förra utgåvan nådde fysiskt rescue-
+Leveransresultat: `artifacts/rescue/usb-delivery.json`. Användaren har efter
+leveransen bekräftat fysisk start och lyckad Codex-inloggning. Beständig
+arbetsdata efter fysisk omstart är inte separat rapporterad. Förra utgåvan nådde fysiskt rescue-
 autologin men misslyckades i Codex-starten; detta är den korrigerade avbilden.
 Autentiserad AI-session är inte verifierad av QEMU-testet.
 
@@ -84,7 +124,7 @@ starta inte om värddatorn. Nästa prioriteringar finns i
 
 ## Börja här efter omstart
 
-1. Läs aktuell rescue-leverans överst. Den gamla 0.1.1-leveransen är historik. Arbeta i `/run/media/nichlas/Kingston1TB/EutherBoot`.
+1. Läs avsnittet om aktuellt direktstartstest överst. Den gamla 0.1.1-leveransen är historik. Arbeta i `/run/media/nichlas/Kingston1TB/EutherBoot`.
 2. Foto och rapport finns sammanfattade nedan; evidens finns i
    `artifacts/physical-0.1.1/`. Vanlig intern start utan USB är ännu inte separat rapporterad.
 3. Läs `artifacts/rescue/usb-delivery.json` och `usb-test-result.json` för aktuell rescue.

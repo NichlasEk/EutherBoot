@@ -613,3 +613,19 @@ kopiorna matchar, sex EFI-partitionsfiler (inklusive kärna och initramfs)
 hashmatchar avbilden och datapartitionen monteras. Separat full
 återläsning hoppades över enligt uttryckligt tidigare önskemål. Fysisk start
 av denna nya utgåva återstår. Se lokal `artifacts/rescue/usb-delivery.json`.
+
+## Separat direktstart-USB för installerat Arch
+
+`scripts/prepare-direct-probe.py` byggde två UKI:er av aktuella kernel-/initramfs-
+kopior. Tillagda PE-sektioner extraherades och hashmatchades med originalen.
+Release-menyns normal- och fallback-val nådde faktisk initramfs i QEMU med rätt
+kärnmarkör; saknad fysisk root bekräftades via skärmbild/OCR. GRUB-reservposten
+valde rätt virtuell ESP och testapplikationen återvände till menyn. Inga interna
+diskar var anslutna. Detta är inte fysisk NVIDIA-/Arch-inloggningsverifiering.
+
+Kingston DataTraveler-leveransen är fsync:ad, GPT-kopior kontrollerade och sex
+filhashar (båda UKI:er, manager, konfiguration, källarkiv, licens) verifierade.
+Alla 366 värdbootfiler är oförändrade. Lokal evidens finns i `artifacts/direct-probe/`
+och `artifacts/direct-delivery/`. Instruktion och begränsningar finns i
+[DIRECT-ARCH-USB.md](DIRECT-ARCH-USB.md). Rescue/Codex har separat fysisk
+användarbekräftelse; direkt Arch-start från den nya stickan återstår.
