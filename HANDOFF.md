@@ -18,14 +18,43 @@ Kingston DataTraveler 3.0, cirka 31 GB, godkändes uttryckligen för överskrivn
 Den nya teststickan är nu färdigskriven, synkad och verifierad; inte omstartad
 på den fysiska datorn ännu.
 
-**Nästa steg:** tillfällig UEFI-bootmeny → Kingston DataTraveler →
-**Arch Linux direkt**. Ingen automatisk start. När Arch är igång:
+### Nästa session: agenten kör kontrollen
+
+Användaren vill slippa terminalkommandon. Be honom bara starta via den
+tillfälliga UEFI-bootmenyn → **Kingston DataTraveler** → **Arch Linux direkt**
+och öppna Codex i detta repo när Arch har startat. Ingen automatisk start.
+Användaren kan skriva ”jag är tillbaka”; agenten gör då nedanstående kontroll.
+
+**Börja med läsning, inte ett nytt bygge eller en ny USB-skrivning.**
+Leveransen är redan klar och pushad i `7240835`. Kontrollera aktuell gitstatus
+och kör följande själv på den startade värden:
 
 ```sh
-grep -o 'eutherboot_probe=[^ ]*' /proc/cmdline
+cat /proc/cmdline
 uname -r
 findmnt -no SOURCE,FSTYPE,FSROOT /
+lsblk -o NAME,TRAN,MODEL,SERIAL,SIZE,FSTYPE,LABEL,MOUNTPOINTS
 ```
+
+- Markören `eutherboot_probe=usb-direct-normal-v1` bekräftar den normala
+ testpostens kommandorad. Tillsammans med användarens rapport om menyval och
+ fungerande Arch-session ger detta evidens för fysisk direktstart.
+- `usb-direct-fallback-v1` betyder att reservposten användes.
+- Saknad markör betyder att direktstart ännu inte är bekräftad. Fråga vilken
+ menyväg som användes; anta inte att USB-start lyckades bara för att Arch kör.
+- Förväntad kärna är `7.2.9-arch1-1`, rotfilsystem Btrfs med subvolym `/@`.
+ Kontrollera också användarens rapport om fungerande grafik. Vid grafikfel:
+ läs relevanta journal-/drivrutinsuppgifter innan ändringar föreslås.
+
+Spara verifierat utfall i denna handoff och `docs/VALIDATION.md`, med tydlig
+skillnad mellan normalstart, reservstart och eventuell GRUB-start. Intern
+installation är ett senare steg: skriv inte intern ESP, NVRAM eller pakethooks
+och ta inte bort GRUB som en del av denna kontroll. Vid startfel använder
+användaren **Befintlig GRUB** eller den tidigare interna startvägen; separat
+rescue-USB finns kvar. Agenten ska inte starta om datorn automatiskt.
+
+Ingen kontrollscriptinstallation behövs; användaren valde denna handoff i
+stället. USB:s startinnehåll ändrades inte under handoff-arbetet.
 
 Förväntad markör: `eutherboot_probe=usb-direct-normal-v1`. Root ska fortfarande
 vara Btrfs `/@`. **Arch Linux reserv** använder aktuell fallback-initramfs;
