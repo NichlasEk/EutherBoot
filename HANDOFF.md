@@ -1,205 +1,125 @@
-# EutherBoot – handoff inför första fysiska USB-testet
+# EutherBoot – handoff inför omstart och fysiskt test av 0.1.1
 
-Uppdaterad 2026-10-11. **Fysisk EutherBoot-meny demonstrerad; GRUB-start blockerad av partitionsidentifieringen.**
+Uppdaterad 2026-10-11. **USB 0.1.1 är levererad och återläst. Nästa steg är
+användarens fysiska F4-test, inte ett nytt bygge eller en ny skrivning.**
 
-## Uppdatering 0.1.1 inför andra försöket
+## Börja här efter omstart
 
-2026-10-11: kompatibilitetsfix för saknat PartitionInfo. Reservvägen verifierar
-GPT via skrivskyddade BlockIO-läsningar och matchar GUID/typ/geometri mot exakt
-firmware-enhet. F4 visar antal firmware-filsystem och verifierade ESP:er samt
-första identifieringsfelet. Den laddar inga extra lagringsdrivrutiner.
+1. Arbeta i `/run/media/nichlas/Kingston1TB/EutherBoot` och läs denna fil.
+2. Samla användarens foto/resultat: syntes **0.1.1**, vad visade **F4**, kom
+   **Existing boot loader** vidare till GRUB och sedan Arch?
+3. Läs `artifacts/host-probe-0.1.1/usb-delivery.json` och `usb-result.json`.
+   Kontrollera `git status --short --branch` och `git log -3 --oneline`.
+4. Om stickan behöver läsas: identifiera enhet, PARTUUID, storlek och mount på
+   nytt. Återanvänd aldrig `/dev/sdf` eller diskseq från förra sessionen blint.
+5. Undersök det observerade felsteget innan någon kod eller USB ändras.
+   En vanlig Linux-start bevisar inte att vägen gick genom EutherBoot.
 
-QEMU: start/återgång och F4 fungerar utan PartitionInfo; saknade/dubbla GUID och
-icke-ESP avvisas fortfarande. Normal väg och F4 i 640×480 passerar. 29 kärntester
-inkluderar CRC-fel, trasiga längder, fel GUID/geometri, attribut och 4K-block.
-Fysisk orsak är fortfarande en hypotes tills nästa test. Ny release/USB-evidens
-läggs i `artifacts/host-probe-0.1.1/`; originalleveransen lämnas som historik.
-Tidigare stickfiler finns i `artifacts/host-probe/pre-gpt-update/`.
+Användaren har godkänt återkommande commit/push och bad uttryckligen om
+kompatibilitetsfixen och USB-uppdateringen. Ingen full installation på intern
+disk är beställd. Licens: GPL-3.0-only.
 
-**0.1.1 är nu levererad på General UDisk.** Kod och matchande källarkiv bygger
-på commit `8e205dd`. EFI och källarkiv skrevs via monterat FAT-filsystem med
-fsync, sedan avmonterades/återmonterades stickan skrivskyddat. SHA-256 på
-samtliga levererade filer stämmer. Konfigurationen och intern GRUB är oförändrade.
-Ingen partitions-/GPT-ändring gjordes vid denna uppdatering. Stickan är kvar vid
-`/run/media/nichlas/F911-7E73`. Identifiera den på nytt inför framtida skrivningar.
+## Aktuell leverans
 
-EFI SHA-256: `82ac7c5f8b117a42812eeec6455be463749f44ddf15468696e5ce88c738c32ab`.
-Leveransevidens: `artifacts/host-probe-0.1.1/usb-delivery.json`.
-Exakt releaseavbild testades i QEMU med separat virtuell mål-ESP före kopiering.
-Äldre hel-ESP-hash längre ned gäller endast första leveransen, inte 0.1.1.
+- **EutherBoot 0.1.1**, kod och matchande källarkiv från commit `8e205dd`.
+  Senare handoff-commits ändrar bara dokumentation. Kod och leveransnotering
+  är pushade till `origin/main` på `https://github.com/NichlasEk/EutherBoot`.
+- **General UDisk**, 15 728 640 000 byte, stabil länk
+  `/dev/disk/by-id/usb-General_UDisk-0:0`. Vid leverans: `/dev/sdf`.
+- 64 MiB FAT32 ESP; resterande utrymme oanvänt. Efter verifiering lämnades
+  den skrivskyddat monterad vid `/run/media/nichlas/F911-7E73`.
+- `EFI/BOOT/BOOTX64.EFI`: release utan QEMU-/felinjektion.
+- `EFI/EutherBoot/source.tar.gz`: matchande källkod och offlineberoenden.
+- `EFI/EutherBoot/eutherboot.toml`: **Existing boot loader**, timeout 0,
+  explicit intern ESP-PARTUUID och `\EFI\BOOT\BOOTX64.EFI` (befintlig GRUB).
+  Personliga identifierare finns i ignorerade artefakter.
+- EFI-filen och källarkivet uppdaterades med fsync. Efter av-/återmontering
+  stämde SHA-256 för båda samt konfigurationen. Konfiguration och intern GRUB
+  är oförändrade. Ingen GPT-/partitionsändring gjordes vid 0.1.1-uppdateringen.
 
-Nästa test: välj USB → kontrollera **0.1.1** → **F4** och fotografera hela
-sökresultatet → Esc → Existing boot loader. GRUB/Arch via den nya versionen
-är ännu inte fysiskt verifierat. Äldre avsnitt nedan beskriver första leveransen.
+EFI SHA-256:
+`82ac7c5f8b117a42812eeec6455be463749f44ddf15468696e5ce88c738c32ab`
 
-## Aktuell överlämning
+Källarkiv SHA-256:
+`cbfff7150fb8e3f1fd550dacc27e4a8b8042e6e4983c3ea341856c587484165d`
 
-Första fysiska försöket har rapporterats med foto: System Regis-menyn visas,
-men valet av befintlig startladdare ger `Missing ESP GUID … Menu retained.`
-Linux-inventering bekräftar att konfigurerad PARTUUID och ESP-typ stämmer;
-UDisks rapporterar GPT-flaggor 0. GRUB via EutherBoot är inte demonstrerad.
+## Vad som är observerat och vad som återstår
 
-QEMU har reproducerat samma feltext när PartitionInfo-protokollet simuleras
-saknat på andra volymer. Tidigare behandlades firmware-status UNSUPPORTED som
-om volymen bevisligen inte var en ESP. Koden skiljer nu protokollbrist från
-verifierat olämpliga partitioner och rapporterar `Firmware lacks PartitionInfo`.
-Detta är en diagnostisk korrigering, ingen verifierad lösning på fysisk uppstart.
-Firmware som inte exponerar den interna disken alls är fortfarande en annan
-möjlig orsak. F4-resultat eller en ny fysisk diagnostikkörning behövs.
-USB är inte omskriven; dess tidigare verifierade innehåll gäller fortfarande.
+Första fysiska försöket, version 0.1.0: foto visar System Regis-menyn och
+`Missing ESP GUID … Menu retained.` GRUB via EutherBoot demonstrerades inte.
+Linux-inventering bekräftade rätt mål-PARTUUID, ESP-typ och GPT-flaggor 0.
 
-Lokal reproduktion före korrigeringen:
-`artifacts/physical-probe-missing-partition-info-before/`.
-Efter korrigeringen:
-`artifacts/cross-volume-missing-partition-info-1024x768/`.
-Testet använder en separat test-faults-binär och disponibla virtuella diskar.
-Verifiering: 25 kärntester, release-bygge utan testfunktioner och fem QEMU-fall
-(same-path-self, missing, duplicate, non-esp, missing-partition-info).
-Protokollbrist ger också `partial=true` i F4. Testerna jämför hela virtuella
-diskens SHA-256 före/efter och provar återgång samt ett fungerande lokalt mål.
+QEMU reproducerade samma feltext när PartitionInfo simulerades saknat.
+Det är ett verifierat kodproblem men **inte bevis för den fysiska orsaken**.
+Version 0.1.1 har en reservväg som läser primär GPT via redan exponerade
+BlockIO-enheter, verifierar header-/tabell-CRC, gränser, ESP-typ, GUID och exakt
+start/storlek mot enhetssökvägen. Den skriver inte till disk, reparerar inte GPT,
+ansluter inte kontroller och laddar inga lagringsdrivrutiner.
 
-Snabbvägen för användaren: spara arbetet → tillfällig UEFI-bootmeny →
-**General UDisk** → **Existing boot loader** → vanlig GRUB → Arch.
-Vid problem: fotografera sista bilden, stäng av, ta ur USB och använd vanlig
-intern uppstart. Den mer kontrollerade testordningen med en vanlig GRUB-start
-som jämförelse finns längre ned.
+F4 visar nu antal firmware-filsystem, verifierade ESP:er och första
+identifieringsfelet. Om firmware inte exponerar den interna disken alls kan
+reservvägen inte hitta den. Det är fortfarande ett separat möjligt felspår.
 
-### Fyll i efter försöket
+Verifierat lokalt:
 
-| Kontrollpunkt | Utfall just nu |
+- 29 kärntester inklusive felaktig CRC, längder, GUID/geometri, attribut och 4K-block.
+- QEMU-start, återgång och F4 utan PartitionInfo på samtliga volymer.
+- Saknade/dubbla GUID och icke-ESP avvisas även med GPT-reservvägen.
+- Normal startväg och F4 vid 640×480 fungerar.
+- Exakt releaseavbild startar ett testprogram på en separat virtuell ESP och
+  återgår till menyn. Hela virtuella diskars kontrollsummor är oförändrade.
+- Fysiska USB-filer återlästa enligt leveransen ovan.
+
+Clippy kördes inte: komponenten saknas i den lokala verktygskedjan.
+QEMU-testprogrammet är inte GRUB; fysisk GRUB-/Arch-kompatibilitet återstår.
+
+## Användarens nästa test
+
+1. Spara arbetet och öppna firmwarets tillfälliga bootmeny.
+2. Välj **General UDisk**, kontrollera **0.1.1** nere till höger.
+3. Tryck **F4** och fotografera hela sökresultatet, inklusive antal och feltext.
+4. Tryck **Esc**, välj **Existing boot loader** och tryck Enter.
+5. Notera om vanlig GRUB visas och om Arch når skrivbordet. Efter inloggning:
+   notera `uname -r`. Om fel uppstår, fotografera sista bilden.
+
+Vid problem: stäng av vid behov, ta ur USB och använd den vanliga interna
+startvägen. Ingen avinstallation behövs. Ändra inte permanent bootordning eller
+Secure Boot-nycklar. Om Arch även misslyckas via vanlig GRUB, undersök det separat.
+Äldre kernelinventering är historisk; kontrollera aktuella versioner vid behov.
+
+| Kontrollpunkt för 0.1.1 | Status |
 | --- | --- |
-| USB syns som UEFI-val i firmware | Ej rapporterat |
-| EutherBoot-titel och meny visas | Bekräftat på foto |
-| Menyn är läsbar och tangentbordet svarar | Ej rapporterat |
-| Enter på Existing boot loader visar vanlig GRUB | Ej rapporterat |
-| Arch når inloggning/skrivbord | Ej rapporterat |
-| Körande kernel efter försöket (`uname -r`) | Ej rapporterat |
-| Feltext/foto och sista fungerande steg | Missing ESP GUID; menyn kvar |
-| Vanlig intern GRUB-start fungerar utan USB | Ej rapporterat |
+| Fysisk meny visar 0.1.1 | Väntar på användarens test |
+| F4: antal filsystem/ESP och identifieringsfel | Väntar på foto |
+| F4: intern GRUB-fil syns | Ej verifierat |
+| Existing boot loader → vanlig GRUB | Ej verifierat |
+| GRUB → Arch/skrivbord | Ej verifierat |
+| Vanlig intern start utan USB | Inget separat kontrollresultat rapporterat |
 
-Tidigare förslag på första fråga efter återkomst: **”Kom du till EutherBoot, sedan GRUB
-och till sist Arch? Om inte, vad var den sista bild eller feltext du såg?”**
+## Evidens och återgångsfiler
 
-## Läs detta först efter omstart
+Alla nedanstående artefakter är avsiktligt Git-ignorerade:
 
-Arbeta i `/run/media/nichlas/Kingston1TB/EutherBoot`. Läs denna fil och
-`docs/HOST-COMPATIBILITY.md`, kontrollera Git och de lokala resultatfilerna innan
-något byggs om eller skrivs. Fråga efter vad användaren faktiskt såg under testet.
-En lyckad Linux-start ensam bevisar inte att vägen gick genom EutherBoot.
+- `artifacts/host-probe-0.1.1/usb-delivery.json`: aktuell fysisk leverans/återläsning.
+- `artifacts/host-probe-0.1.1/usb-result.json`, `boot-1/`, `usb.img`: release-QEMU.
+  `physical_media_written: false` i byggresultatet gäller avbildssteget;
+  den efterföljande filuppdateringen dokumenteras i leveransfilen.
+- `artifacts/host-probe/pre-gpt-update/`: tidigare EFI, konfiguration och källarkiv.
+- `artifacts/physical-first-attempt/menu-missing-esp.png`: första fysiska fotot.
+- `artifacts/physical-probe-missing-partition-info-before/`: ursprunglig reproduktion.
+- `artifacts/cross-volume-missing-partition-info-1024x768/`: senaste lyckade reservvägstest.
+- `artifacts/cross-volume-*-gpt/`: negativa/positiva fall med reservvägen.
+- `artifacts/host-probe/usb-delivery.json`: historisk 0.1.0-leverans.
+  Dess EFI-/hel-ESP-hash gäller **inte** den uppdaterade stickan.
 
-Kod och USB-källarkiv bygger på commit `74da2c3`. Efterföljande handoff-commits
-ändrar endast dokumentation. Användaren har godkänt återkommande commit/push.
-Licens: GPL-3.0-only.
+Lokala flash-/update-skript är engångsverktyg låsta till sessionsidentitet.
+Kör dem inte blint efter omstart. Ingen omskrivning behövs för att samla F4-resultatet.
 
-## Vad som nu finns på USB
+## Avgränsning mot full installation
 
-- General UDisk, 15 728 640 000 byte (cirka 15,7 GB / 14,6 GiB).
-- Vid leveransen: `/dev/sdf`, stabil länk `/dev/disk/by-id/usb-General_UDisk-0:0`.
-  **Identifiera på nytt efter omstart; enhetsbokstaven får inte återanvändas blint.**
-- En 64 MiB FAT32 EFI System Partition, resten oanvänt. Det är avsiktligt.
-- Monterad skrivskyddat vid `/run/media/nichlas/F911-7E73` efter leveransen.
-- `EFI/BOOT/BOOTX64.EFI`: riktig release av EutherBoot, utan testinstrumentering.
-- `EFI/EutherBoot/eutherboot.toml`: ett manuellt val, **Existing boot loader**,
-  timeout 0 (ingen automatisk start).
-- Målet är den befintliga datorns ESP via explicit PARTUUID och
-  `\EFI\BOOT\BOOTX64.EFI`, alltså dess befintliga GRUB. Samma filnamn på USB
-  och intern ESP betyder inte samma mål: partitionens identitet styr valet.
-- USB innehåller GPL-licensen och matchande källarkiv. Avbilden är osignerad;
-  Secure Boot var avstängt vid inventeringen. Ändra inte nycklar eller
-  säkerhetsinställningar för att få testet att fungera.
-
-Personliga partitionsidentifierare ligger i ignorerade lokala artefakter,
-inte i denna versionshanterade handoff.
-
-## Testordning och återgång
-
-1. Spara pågående arbete. För en tydlig jämförelse: starta först via den vanliga,
-   oförändrade GRUB-vägen och kontrollera att Arch fungerar. Inventeringen visade
-   körande 7.2.6-arch2-1 men installerad 7.2.9.arch1-1; nästa vanliga start provar
-   alltså även en redan väntande kerneluppdatering.
-2. Med USB anslutet: starta om och öppna moderkortets **tillfälliga bootmeny**.
-   Välj USB-enhetens UEFI-alternativ, exempelvis `UEFI: General UDisk`.
-   Ändra inte permanent bootordning. Exakt tangent/etikett är ännu inte verifierad.
-3. Kontrollera att EutherBoot/System Regis syns och att menyn är läsbar.
-   Notera upplösning, eventuell svart bild och om tangentbordet svarar.
-4. Välj **Existing boot loader** och tryck Enter. Bekräfta att den vanliga
-   GRUB-menyn verkligen visas, välj sedan normal Arch-start.
-5. Efter inloggning: notera `uname -r` och om grafik/inloggning fungerar.
-   Rapportera kedjan **firmware → EutherBoot → GRUB → Arch**, steg för steg.
-
-Om USB saknas i bootmenyn, skärmen blir svart eller start misslyckas: fotografera
-sista synliga bild/feltext och notera exakt senaste fungerande steg. Stäng av vid
-behov, ta ur USB och välj den vanliga interna startvägen. Ingen avinstallation
-behövs eftersom ingen EutherBoot-installation gjorts på intern disk.
-
-Om Arch misslyckas även via vanlig GRUB ska det undersökas separat från USB-menyn;
-den väntande kerneluppdateringen är en möjlig skillnad, inte en fastställd orsak.
-Radera inte befintliga fallback-filer som felsökningsåtgärd.
-
-## Bevis och avgränsningar
-
-Leveransen verifierade:
-
-- Hela 128 MiB råavbilden efter skrivning: SHA-256 stämde exakt.
-- GPT-reservtabellen flyttades till USB-enhetens verkliga slut. De skrivna
-  GPT-sektorerna återlästes och jämfördes med den validerade GPT-tabellen.
-- Hela 64 MiB EFI-partitionen återlästes och jämfördes efter GPT-ändringen.
-- Monterad EFI-fil och TOML-konfiguration jämfördes med originalen.
-- Den befintliga GRUB-filen på `/boot` hade oförändrad kontrollsumma.
-
-Avbildens SHA-256:
-`7cbde55b16dfbfff08072b5af0882511691a39cb7c3e7e7385b262cc91b9295b`
-
-EFI-filens SHA-256:
-`c674a24b4b5fc15793fd6775bd0a725599a4cbde753708b66e9c76cd18e6d823`
-
-**Hela USB-enheten ska inte jämföras med råavbildens hash efter GPT-flytten.**
-Den är större och GPT-headern är avsiktligt ändrad. EFI-partitionens verifierade hash:
-`da10f86d47370b24b11e4830be1c44c96218d5250831d0b7f17fdf3a0b6e8978`
-
-Lokal evidens, avsiktligt Git-ignorerad:
-
-- `artifacts/host-probe/usb-delivery.json`: fysisk skrivning, GPT, återläsning
-  och monterad filverifiering. `physical_boot_tested` är fortfarande false.
-- `artifacts/host-probe/usb-result.json`: avbildsbyggets QEMU-resultat. Dess
-  `physical_media_written: false` beskriver byggsteget före leveransen;
-  leveransfilen ovan dokumenterar den senare fysiska skrivningen.
-- `artifacts/host-probe/usb-eutherboot.toml`: exakt personlig målkonfiguration.
-- `artifacts/host-probe/existing-loader.sha256`: kontrollsumma för intern GRUB.
-- `artifacts/host-probe/boot-1/`: bilder från det virtuella avbildstestet.
-- `artifacts/host-compatibility.json`: tidigare skrivskyddad värdinventering.
-- `artifacts/arch-host-layout/result.json`: godkänd virtuell Arch-matris.
-
-Skrivningen gjordes via UDisks efter användarens systemautentisering. Direkt
-`sgdisk` mot den överlämnade filbeskrivaren nekades åtkomst efter lyckad rååterläsning.
-GPT justerades därför i en lokal gles fil, validerades, skrevs sektorsvis till
-USB och återlästes. En USB-reset noterades i kärnloggen under skrivningen;
-slutlig återläsning och monterad kontroll lyckades. Det bevisar inte långvarig
-medietillförlitlighet. De lokala flash-skripten är engångsverktyg med låst
-sessionsidentitet och ska **inte** köras blint efter omstart.
-
-## Vad detta inte installerar eller bevisar
-
-Ingen ändring av hostens BootOrder, Secure Boot-nycklar, interna partitioner,
-bootloaderfiler eller Arch-hooks har gjorts. USB-testet demonstrerar ännu inte
-fysisk firmware-, tangentbords-, grafik- eller GRUB-kompatibilitet.
-
-Virtuell testning har demonstrerat Btrfs `@`, ESP vid `/boot`, udev-initramfs,
-normal/LTS/recovery, uppgradering och återgång med en **2 GiB virtuell ESP**.
-Den installerar inte motsvarande hantering på denna dator. Nuvarande 1 GiB ESP
-hade cirka 419 MiB ledigt och normal initramfs cirka 257 MiB. Kapacitetskontrollen
-kräver betydligt mer utrymme för UKI-generationer och staging; LTS/ukify och
-matchande NVIDIA-stöd saknades också. Full hanterad installation är därför inte
-redo här. Extern linux-efi-initrd har dessutom en nuvarande gräns på 128 MiB.
-
-## Nästa utvecklaråtgärd
-
-Samla först det fysiska utfallet. Uppdatera handoff och evidens med observerade
-steg, inte antaganden. Vid fel: skilj USB-upptäckt, EFI-start, rendering/input,
-partitionsval, GRUB-chainload och Linux-start åt. Gör ett smalt reproducerbart
-test för det felande steget innan större kodändringar. Bygg inte om eller flasha
-om en redan verifierad sticka enbart för att en ny session har börjat.
-
-En lyckad USB-kedja avslutar första fysiska kompatibilitetsprovet. Full installation
-med automatiska Arch-uppdateringar kräver fortfarande separat lagringsplan,
-förutsättningar och uttryckligt godkänd installation på den riktiga datorn.
+BootOrder, Secure Boot-nycklar, interna partitioner, bootloaderfiler och Arch-hooks
+har inte ändrats. Läs `docs/HOST-COMPATIBILITY.md` före eventuell installationsplan.
+Tidigare inventering visade otillräckligt ESP-utrymme för hanterade UKI-generationer
+samt saknade LTS/ukify-förutsättningar. Den virtuella Arch-matrisen använde en
+2 GiB ESP och verifierar inte värdens NVIDIA-drivrutin eller fysiska firmware.
+Full installation kräver separat lagringsplan och uttrycklig beställning.
