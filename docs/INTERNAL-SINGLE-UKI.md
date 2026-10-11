@@ -1,5 +1,56 @@
 # Intern EutherBoot utan GRUB
 
+## Utökning med LTS · 2026-10-11
+
+Användaren har bekräftat fysisk intern normalstart utan GRUB. Livekontrollen
+visade `eutherboot.internal=single-v1`, kernel `7.2.9-arch1-1`, Btrfs `/@`
+och firmwareposten `UEFI OS` på interna ESP:n. Ingen USB var ansluten.
+Användaren har därefter beställt ett separat LTS-reservval utan GRUB.
+
+Profilen stöder nu `linux` och valfritt `linux-lts`, med egna UKI-filer:
+`arch-normal.efi` och `arch-lts.efi`. Arch är standard, LTS heter
+**Arch Linux LTS (reserv)**. LTS använder samma installerade rotfilsystem;
+rescue-stickan behövs fortfarande vid skadat root, större paketfel eller diskfel.
+LTS är inte en fristående rescue eller en fryst tidigare systemgeneration.
+
+`add-lts --hooks packaging/arch-single PAKETFILER...` utökar en befintlig
+single-installation, säkerhetskopierar integrationen under
+`/var/lib/eutherboot-single/before-lts`, installerar en staging-preset och
+installerar paketen med pacman. På värdar med DKMS ska även
+`linux-lts-headers` ingå, så att installerade extramoduler kan byggas.
+NVIDIA-paketet måste matcha LTS-kärnan och installerad `nvidia-utils`.
+LTS byggs och verifieras före menyposten.
+Existerande anpassad LTS-preset eller meny avvisas. Ett avbrutet tillägg ska
+inspekteras och återställas från denna kopia före nytt försök; kommandot är
+avsiktligt inte en blind, upprepningsbar återställningsoperation.
+
+Båda presets bygger på root. Wrappern inväntar lyckat byggkommando, verifierar
+båda färdiga avbilderna mot respektive installerad kärna och kommandorad,
+och räknar utrymme inklusive eventuell tillväxt innan första publiceringen.
+Filerna kopieras en i taget till ESP, synkas och hashkontrolleras före namnbyte.
+Uppdateringar behöver plats för den största tillfälliga avbilden plus 64 MiB;
+tillägget kontrollerar också att denna marginal finns efter installationen.
+Pakethookarna inkluderar linux-lts och nvidia-open-lts/nvidia-lts.
+Borttagning av hanterade kärnpaket stoppas före transaktionen.
+
+`rebuild` bygger och publicerar båda kärnorna när `single.json` har `lts: true`.
+Enbart `mkinitcpio -P` publicerar fortfarande inget. Kernelpaketens modulträd
+hanteras av pacman. Ett fel efter paketinstallationen rullar inte tillbaka
+paket eller moduler. Ett I/O-fel under den andra publiceringen kan lämna
+första bilden uppdaterad och andra oförändrad; två filbyten är inte en atomisk
+transaktion tillsammans. Använd rescue om paket/moduler och UKI inte stämmer.
+
+Vid önskad återgång till endast normalstart: verifiera normalstarten först,
+ta bort LTS-posten, återställ integrationens sparade konfiguration/verktyg/hooks,
+och avinstallera därefter LTS-paketen och ta bort dess separata UKI.
+Återställ inte den äldre GRUB-kopian för denna återgång.
+
+Fysisk LTS-start och grafik måste provas på datorn efter installation.
+Se `HANDOFF.md` för aktuell leveransstatus och `artifacts/lts-qemu/result.json`
+för den disponibla virtuella provningen.
+
+## Ursprunglig single-installation (historik)
+
 Plan och läsande kapacitetskontroll 2026-10-11. Användaren vill ta bort GRUB
 helt och använda den fysiskt provade Euther Rescue-stickan som återväg.
 Normal direktstart via EutherBoot från test-USB och fungerande grafik är

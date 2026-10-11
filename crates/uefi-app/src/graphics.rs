@@ -159,16 +159,18 @@ impl Canvas {
     }
     fn icon(&mut self, x: usize, y: usize, label: &str) {
         let accent = BltPixel::new(114, 215, 213);
-        if label.to_ascii_lowercase().contains("arch") {
-            for pair in [
-                (0, 64, 28, 0),
-                (28, 0, 56, 64),
-                (0, 64, 20, 52),
-                (36, 52, 56, 64),
-                (20, 52, 28, 36),
-                (28, 36, 36, 52),
-            ] {
-                self.line(x + pair.0, y + pair.1, x + pair.2, y + pair.3, accent);
+        if let Some(icon) = boot_core::presentation::os_icon(label).and_then(crate::os_icons::asset)
+        {
+            let rgb = match crate::ui::theme() {
+                2 => icon.light,
+                3 => [255, 255, 255],
+                _ => icon.dark,
+            };
+            let color = BltPixel::new(rgb[0], rgb[1], rgb[2]);
+            for yy in 0..64 {
+                for xx in 0..64 {
+                    self.blend(x + xx, y + yy, color, icon.alpha[yy * 64 + xx] as u32);
+                }
             }
         } else {
             self.panel(x, y + 6, 60, 48, false);

@@ -1,5 +1,95 @@
 # Validation · 2026-10-10 · Arch kernel updates and LoadFile2
 
+## OS icon gallery · 2026-10-11
+
+32 embedded OS masks cover Windows, 30 Linux distributions/variants and generic
+Linux. Host tests cover punctuation/case normalization, reserve suffixes,
+derivative precedence and false Arch substring matches. `cargo test -p boot-core`
+and the UEFI builds passed. SVG sources and per-icon provenance/license metadata
+are vendored; rasterization is reproducible offline.
+
+`scripts/test-os-icons-qemu.py` passed 160 silhouette checks across all icons:
+1024x768 in dark, light and high-contrast themes; 640x480 and 1280x960 in dark.
+The checker compares opaque/transparent mask pixels with actual framebuffer
+pixels on every menu page, verifies white high-contrast icons, chainloads a
+disposable EFI child and returns, and checks text fallback. Screenshots wait
+for completed rendering rather than the earlier selection event.
+
+The exact production EFI was separately tested with the host's two menu names
+and EFI paths (timeout disabled, disposable test children substituted for UKIs).
+Both targets chainloaded and returned with icons visible. No physical disks or
+network were attached, and no bootloader debug trace was emitted by that build.
+This is not a fresh physical normal/LTS boot test.
+
+Evidence: `artifacts/icons/qemu/result.json`, gallery screenshots,
+`artifacts/icons/production-qemu/result.json`, and `artifacts/icons/build.log`.
+See `OS-ICONS.md` for supported names and attribution.
+
+The production EFI and matching source archive were subsequently installed on
+the host, backed up under `/var/lib/eutherboot-single/before-os-icons`, synced
+and hash-verified. Menu, both UKI hashes and firmware entries remained unchanged.
+Evidence: `artifacts/icons/installed-result.json` and `install.log`.
+Physical boot with this updated EFI remains untested.
+
+## Host LTS installation · 2026-10-11
+
+LTS `6.18.55-1-lts`, matching `nvidia-open-lts` 615.78.08 and LTS headers
+are installed. Both production UKIs were rebuilt by the deployed wrapper,
+validated against package-owned kernels/cmdline and hash-compared to staging.
+NVIDIA version/vermagic and all four early NVIDIA modules were checked for
+both images; Btrfs support is built into both kernels. All four existing DKMS
+modules are installed for both kernels, including VirtualBox. Missing-header
+errors from the initial transaction were resolved by installing LTS headers.
+
+Normal remains default with a 10-second timeout; LTS is a separate menu entry.
+ESP free space is 449,863,680 bytes (429.0 MiB). The preflight check
+passed. Bootloader hash and firmware entries are unchanged, and GRUB is absent.
+The prior normal image and integration were backed up on root.
+
+Evidence: `artifacts/internal-lts/installed-result.json` and `verify.log`.
+The first ad-hoc content checker expected underscore NVIDIA filenames and a
+loadable Btrfs module. It was corrected to accept actual hyphen filenames and
+package-confirmed built-in Btrfs; the final checker passed without changing
+boot payloads for those checks. No physical LTS boot or NVIDIA rendering test
+has occurred yet. The host was not rebooted.
+
+## Optional LTS integration · 2026-10-11
+
+`scripts/test-lts-qemu.py` passed on a disposable 1 GiB FAT ESP and Btrfs `/@`
+with the production release EFI, no network and no host disks attached.
+The sequence installed the single profile, cold-booted normal Arch, added
+real `linux-lts` 6.18.55, upgraded normal linux 7.2.7 to 7.2.9, cold-booted
+LTS, reinstalled LTS through real pacman hooks, and cold-booted normal 7.2.9.
+Module loading and absence of failed systemd units were checked on each boot.
+The base image hash remained unchanged.
+
+Both active UKIs were padded to 286,150,656 bytes to exercise host-sized
+coexistence and sequential replacement. A corrupt staged LTS image and a
+failed mkinitcpio build preserved both active hashes. A filled ESP caused
+pacman's LTS pre-transaction hook to abort; managed LTS removal was also
+refused. Four Python tests check copy/rename failures, validation-before-
+publication, aggregate growth budgeting, and rejection of symlinked staging.
+
+The initial run caught a regression: checking presets before the upstream
+install hook rejected kernel upgrades because the upstream removal hook had
+saved the preset as `.pacsave`. The wrapper now lets the upstream install hook
+restore/build first, then verifies presets and images before publication.
+The final run passed real normal upgrades and LTS reinstalls with this fix.
+
+Evidence: `artifacts/lts-qemu/result.json`, four serial boot logs and
+`artifacts/lts-qemu-run.log`. The virtual driver trigger is synthetic;
+physical NVIDIA/LTS operation requires the separate host boot test.
+
+## Physical internal normal boot · 2026-10-11
+
+The user returned after the migration and reported successful startup with
+GRUB absent and only Arch in the menu. Live checks verified
+`eutherboot.internal=single-v1`, kernel `7.2.9-arch1-1`, Btrfs `/@`, internal
+vfat ESP and BootCurrent 0001 pointing to the internal EFI path. No USB disk
+was connected. This confirms physical internal normal boot; it does not
+confirm the newly requested LTS path. Read-only evidence was saved in
+`artifacts/internal-lts/before.json`.
+
 ## Single UKI with external rescue · 2026-10-11
 
 `scripts/test-single-qemu.py` passed on a disposable 1 GiB FAT ESP and a

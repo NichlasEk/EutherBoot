@@ -1,0 +1,415 @@
+{
+  "simple_icons_commit": "dc7b10662a0a2cfdfc9305e2a2b06c023c30724a",
+  "icons": [
+    {
+      "name": "Windows",
+      "slug": "windows",
+      "hex": "0078D4",
+      "url": null,
+      "brand_source": "Locally drawn four-pane window; GPL-3.0-only."
+    },
+    {
+      "name": "Arch Linux",
+      "slug": "archlinux",
+      "hex": "1793D1",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/dc7b10662a0a2cfdfc9305e2a2b06c023c30724a/icons/archlinux.svg",
+      "brand_source": "https://www.archlinux.org/art",
+      "upstream_metadata": {
+        "title": "Arch Linux",
+        "hex": "1793D1",
+        "source": "https://www.archlinux.org/art",
+        "guidelines": "https://wiki.archlinux.org/index.php/DeveloperWiki:TrademarkPolicy#Logo_Usage_Guidelines"
+      }
+    },
+    {
+      "name": "Debian",
+      "slug": "debian",
+      "hex": "A81D33",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/dc7b10662a0a2cfdfc9305e2a2b06c023c30724a/icons/debian.svg",
+      "brand_source": "https://www.debian.org/logos",
+      "upstream_metadata": {
+        "title": "Debian",
+        "hex": "A81D33",
+        "source": "https://www.debian.org/logos",
+        "guidelines": "https://www.debian.org/logos/",
+        "license": {
+          "type": "CC-BY-SA-3.0"
+        }
+      }
+    },
+    {
+      "name": "Ubuntu",
+      "slug": "ubuntu",
+      "hex": "E95420",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/dc7b10662a0a2cfdfc9305e2a2b06c023c30724a/icons/ubuntu.svg",
+      "brand_source": "https://design.ubuntu.com/resources",
+      "upstream_metadata": {
+        "title": "Ubuntu",
+        "hex": "E95420",
+        "source": "https://design.ubuntu.com/resources",
+        "guidelines": "https://design.ubuntu.com/brand"
+      }
+    },
+    {
+      "name": "Linux Mint",
+      "slug": "linuxmint",
+      "hex": "86BE43",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/dc7b10662a0a2cfdfc9305e2a2b06c023c30724a/icons/linuxmint.svg",
+      "brand_source": "https://github.com/linuxmint/brand-logo/blob/540ac3b08e987866d77a340f557f994c988ac2ae/ring-mono-green.svg",
+      "upstream_metadata": {
+        "title": "Linux Mint",
+        "hex": "86BE43",
+        "source": "https://github.com/linuxmint/brand-logo/blob/540ac3b08e987866d77a340f557f994c988ac2ae/ring-mono-green.svg"
+      }
+    },
+    {
+      "name": "Fedora",
+      "slug": "fedora",
+      "hex": "51A2DA",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/dc7b10662a0a2cfdfc9305e2a2b06c023c30724a/icons/fedora.svg",
+      "brand_source": "https://docs.fedoraproject.org/en-US/project/brand/",
+      "upstream_metadata": {
+        "title": "Fedora",
+        "hex": "51A2DA",
+        "source": "https://docs.fedoraproject.org/en-US/project/brand/",
+        "guidelines": "https://fedoraproject.org/wiki/Legal:Trademark_guidelines",
+        "license": {
+          "type": "custom",
+          "url": "https://docs.fedoraproject.org/en-US/project/brand/"
+        }
+      }
+    },
+    {
+      "name": "openSUSE",
+      "slug": "opensuse",
+      "hex": "73BA25",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/dc7b10662a0a2cfdfc9305e2a2b06c023c30724a/icons/opensuse.svg",
+      "brand_source": "https://github.com/openSUSE/artwork/blob/33e94aa76837c09f03d1712705949b71a246a53b/logos/buttons/button-colour.svg",
+      "upstream_metadata": {
+        "title": "openSUSE",
+        "hex": "73BA25",
+        "source": "https://github.com/openSUSE/artwork/blob/33e94aa76837c09f03d1712705949b71a246a53b/logos/buttons/button-colour.svg",
+        "guidelines": "https://en.opensuse.org/Portal:Artwork"
+      }
+    },
+    {
+      "name": "Manjaro",
+      "slug": "manjaro",
+      "hex": "35BFA4",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/dc7b10662a0a2cfdfc9305e2a2b06c023c30724a/icons/manjaro.svg",
+      "brand_source": "https://manjaro.org",
+      "upstream_metadata": {
+        "title": "Manjaro",
+        "hex": "35BFA4",
+        "source": "https://manjaro.org"
+      }
+    },
+    {
+      "name": "EndeavourOS",
+      "slug": "endeavouros",
+      "hex": "7F7FFF",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/dc7b10662a0a2cfdfc9305e2a2b06c023c30724a/icons/endeavouros.svg",
+      "brand_source": "https://github.com/endeavouros-team/endeavouros-theming/blob/135f642c980ed8d8fc212783eb478f96226f6c72/endeavouros-logo-text.svg",
+      "upstream_metadata": {
+        "title": "EndeavourOS",
+        "hex": "7F7FFF",
+        "source": "https://github.com/endeavouros-team/endeavouros-theming/blob/135f642c980ed8d8fc212783eb478f96226f6c72/endeavouros-logo-text.svg"
+      }
+    },
+    {
+      "name": "Pop!_OS",
+      "slug": "popos",
+      "hex": "48B9C7",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/dc7b10662a0a2cfdfc9305e2a2b06c023c30724a/icons/popos.svg",
+      "brand_source": "https://github.com/system76/brand/blob/7a31740b54f929b62a165baa61dfb0b5164261e8/Pop_OS%20branding/Pop_icon.svg",
+      "upstream_metadata": {
+        "title": "Pop!_OS",
+        "hex": "48B9C7",
+        "source": "https://github.com/system76/brand/blob/7a31740b54f929b62a165baa61dfb0b5164261e8/Pop_OS%20branding/Pop_icon.svg"
+      }
+    },
+    {
+      "name": "elementary",
+      "slug": "elementary",
+      "hex": "64BAFF",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/dc7b10662a0a2cfdfc9305e2a2b06c023c30724a/icons/elementary.svg",
+      "brand_source": "https://elementary.io/brand",
+      "upstream_metadata": {
+        "title": "elementary",
+        "hex": "64BAFF",
+        "source": "https://elementary.io/brand"
+      }
+    },
+    {
+      "name": "Gentoo",
+      "slug": "gentoo",
+      "hex": "54487A",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/dc7b10662a0a2cfdfc9305e2a2b06c023c30724a/icons/gentoo.svg",
+      "brand_source": "https://wiki.gentoo.org/wiki/Project:Artwork/Artwork#Variations_of_the_.22g.22_logo",
+      "upstream_metadata": {
+        "title": "Gentoo",
+        "hex": "54487A",
+        "source": "https://wiki.gentoo.org/wiki/Project:Artwork/Artwork#Variations_of_the_.22g.22_logo",
+        "guidelines": "https://www.gentoo.org/inside-gentoo/foundation/name-logo-guidelines.html",
+        "license": {
+          "type": "CC-BY-SA-2.5"
+        }
+      }
+    },
+    {
+      "name": "Slackware",
+      "slug": "slackware",
+      "hex": "000000",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/dc7b10662a0a2cfdfc9305e2a2b06c023c30724a/icons/slackware.svg",
+      "brand_source": "https://en.wikipedia.org/wiki/Slackware",
+      "upstream_metadata": {
+        "title": "Slackware",
+        "hex": "000000",
+        "source": "https://en.wikipedia.org/wiki/Slackware"
+      }
+    },
+    {
+      "name": "Alpine Linux",
+      "slug": "alpinelinux",
+      "hex": "0D597F",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/dc7b10662a0a2cfdfc9305e2a2b06c023c30724a/icons/alpinelinux.svg",
+      "brand_source": "https://alpinelinux.org",
+      "upstream_metadata": {
+        "title": "Alpine Linux",
+        "hex": "0D597F",
+        "source": "https://alpinelinux.org"
+      }
+    },
+    {
+      "name": "NixOS",
+      "slug": "nixos",
+      "hex": "5277C3",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/dc7b10662a0a2cfdfc9305e2a2b06c023c30724a/icons/nixos.svg",
+      "brand_source": "https://brand.nixos.org/logos/nixos-logomark-black-flat-minimal.svg",
+      "upstream_metadata": {
+        "title": "NixOS",
+        "hex": "5277C3",
+        "source": "https://brand.nixos.org/logos/nixos-logomark-black-flat-minimal.svg",
+        "guidelines": "https://brand.nixos.org/documents/nixos-branding-guide.pdf",
+        "license": {
+          "type": "CC-BY-4.0"
+        }
+      }
+    },
+    {
+      "name": "Void Linux",
+      "slug": "voidlinux",
+      "hex": "478061",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/dc7b10662a0a2cfdfc9305e2a2b06c023c30724a/icons/voidlinux.svg",
+      "brand_source": "https://alpha.de.repo.voidlinux.org/logos/void-dark2.svg",
+      "upstream_metadata": {
+        "title": "Void Linux",
+        "hex": "478061",
+        "source": "https://alpha.de.repo.voidlinux.org/logos/void-dark2.svg"
+      }
+    },
+    {
+      "name": "Kali Linux",
+      "slug": "kalilinux",
+      "hex": "557C94",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/dc7b10662a0a2cfdfc9305e2a2b06c023c30724a/icons/kalilinux.svg",
+      "brand_source": "https://www.kali.org/docs/policy/trademark/",
+      "upstream_metadata": {
+        "title": "Kali Linux",
+        "hex": "557C94",
+        "source": "https://www.kali.org/docs/policy/trademark/",
+        "guidelines": "https://www.kali.org/docs/policy/trademark/"
+      }
+    },
+    {
+      "name": "Parrot Security",
+      "slug": "parrotsecurity",
+      "hex": "15E0ED",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/dc7b10662a0a2cfdfc9305e2a2b06c023c30724a/icons/parrotsecurity.svg",
+      "brand_source": "https://gitlab.com/parrotsec/project/documentation/-/blob/d1d426b9cb3ea0efd16a2b34056c1ebb21bb9af9/static/img/parrot-logo.svg",
+      "upstream_metadata": {
+        "title": "Parrot Security",
+        "hex": "15E0ED",
+        "source": "https://gitlab.com/parrotsec/project/documentation/-/blob/d1d426b9cb3ea0efd16a2b34056c1ebb21bb9af9/static/img/parrot-logo.svg"
+      }
+    },
+    {
+      "name": "Zorin",
+      "slug": "zorin",
+      "hex": "15A6F0",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/dc7b10662a0a2cfdfc9305e2a2b06c023c30724a/icons/zorin.svg",
+      "brand_source": "https://zorin.com/press",
+      "upstream_metadata": {
+        "title": "Zorin",
+        "hex": "15A6F0",
+        "source": "https://zorin.com/press"
+      }
+    },
+    {
+      "name": "Rocky Linux",
+      "slug": "rockylinux",
+      "hex": "10B981",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/dc7b10662a0a2cfdfc9305e2a2b06c023c30724a/icons/rockylinux.svg",
+      "brand_source": "https://github.com/rocky-linux/branding/blob/94e97dd30b87d909cc4f6a6838a2926f77f9ac47/logo/src/icon-black.svg",
+      "upstream_metadata": {
+        "title": "Rocky Linux",
+        "hex": "10B981",
+        "source": "https://github.com/rocky-linux/branding/blob/94e97dd30b87d909cc4f6a6838a2926f77f9ac47/logo/src/icon-black.svg",
+        "license": {
+          "type": "CC-BY-SA-4.0"
+        }
+      }
+    },
+    {
+      "name": "AlmaLinux",
+      "slug": "almalinux",
+      "hex": "000000",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/dc7b10662a0a2cfdfc9305e2a2b06c023c30724a/icons/almalinux.svg",
+      "brand_source": "https://almalinux.org",
+      "upstream_metadata": {
+        "title": "AlmaLinux",
+        "hex": "000000",
+        "source": "https://almalinux.org",
+        "guidelines": "https://almalinux.org/p/the-almalinux-os-trademark-usage-policy/"
+      }
+    },
+    {
+      "name": "CentOS",
+      "slug": "centos",
+      "hex": "262577",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/dc7b10662a0a2cfdfc9305e2a2b06c023c30724a/icons/centos.svg",
+      "brand_source": "https://wiki.centos.org/ArtWork/Brand/Logo",
+      "upstream_metadata": {
+        "title": "CentOS",
+        "hex": "262577",
+        "source": "https://wiki.centos.org/ArtWork/Brand/Logo"
+      }
+    },
+    {
+      "name": "Red Hat",
+      "slug": "redhat",
+      "hex": "EE0000",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/dc7b10662a0a2cfdfc9305e2a2b06c023c30724a/icons/redhat.svg",
+      "brand_source": "https://www.redhat.com/en/about/brand/new-brand/details",
+      "upstream_metadata": {
+        "title": "Red Hat",
+        "hex": "EE0000",
+        "source": "https://www.redhat.com/en/about/brand/new-brand/details"
+      }
+    },
+    {
+      "name": "Artix Linux",
+      "slug": "artixlinux",
+      "hex": "10A0CC",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/dc7b10662a0a2cfdfc9305e2a2b06c023c30724a/icons/artixlinux.svg",
+      "brand_source": "https://gitea.artixlinux.org/artix/artwork/src/commit/256432e3d06b3e9024bfd6912768e80281ea3746/icons/logo-gray.svg",
+      "upstream_metadata": {
+        "title": "Artix Linux",
+        "hex": "10A0CC",
+        "source": "https://gitea.artixlinux.org/artix/artwork/src/commit/256432e3d06b3e9024bfd6912768e80281ea3746/icons/logo-gray.svg"
+      }
+    },
+    {
+      "name": "Garuda Linux",
+      "slug": "garudalinux",
+      "hex": "8839EF",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/dc7b10662a0a2cfdfc9305e2a2b06c023c30724a/icons/garudalinux.svg",
+      "brand_source": "https://gitlab.com/garuda-linux/themes-and-settings/artwork/garuda-icons/-/blob/aab26625fe01479ebc3a252103fca723baca9e88/usr/share/icons/garuda/distributor-logo-garuda-outline.svg",
+      "upstream_metadata": {
+        "title": "Garuda Linux",
+        "hex": "8839EF",
+        "source": "https://gitlab.com/garuda-linux/themes-and-settings/artwork/garuda-icons/-/blob/aab26625fe01479ebc3a252103fca723baca9e88/usr/share/icons/garuda/distributor-logo-garuda-outline.svg",
+        "license": {
+          "type": "GPL-3.0-only"
+        }
+      }
+    },
+    {
+      "name": "MX Linux",
+      "slug": "mxlinux",
+      "hex": "000000",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/dc7b10662a0a2cfdfc9305e2a2b06c023c30724a/icons/mxlinux.svg",
+      "brand_source": "https://mxlinux.org/art/",
+      "upstream_metadata": {
+        "title": "MX Linux",
+        "hex": "000000",
+        "source": "https://mxlinux.org/art/",
+        "license": {
+          "type": "GPL-3.0-only"
+        }
+      }
+    },
+    {
+      "name": "Nobara Linux",
+      "slug": "nobaralinux",
+      "hex": "000000",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/dc7b10662a0a2cfdfc9305e2a2b06c023c30724a/icons/nobaralinux.svg",
+      "brand_source": "https://wiki.nobaraproject.org",
+      "upstream_metadata": {
+        "title": "Nobara Linux",
+        "hex": "000000",
+        "source": "https://wiki.nobaraproject.org"
+      }
+    },
+    {
+      "name": "Kubuntu",
+      "slug": "kubuntu",
+      "hex": "0079C1",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/dc7b10662a0a2cfdfc9305e2a2b06c023c30724a/icons/kubuntu.svg",
+      "brand_source": "https://kubuntu.org",
+      "upstream_metadata": {
+        "title": "Kubuntu",
+        "hex": "0079C1",
+        "source": "https://kubuntu.org"
+      }
+    },
+    {
+      "name": "Lubuntu",
+      "slug": "lubuntu",
+      "hex": "0068C8",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/dc7b10662a0a2cfdfc9305e2a2b06c023c30724a/icons/lubuntu.svg",
+      "brand_source": "https://lubuntu.net",
+      "upstream_metadata": {
+        "title": "Lubuntu",
+        "hex": "0068C8",
+        "source": "https://lubuntu.net"
+      }
+    },
+    {
+      "name": "Xubuntu",
+      "slug": "xubuntu",
+      "hex": "0044AA",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/dc7b10662a0a2cfdfc9305e2a2b06c023c30724a/icons/xubuntu.svg",
+      "brand_source": "https://commons.wikimedia.org/wiki/File:Xubuntu_Icon.svg",
+      "upstream_metadata": {
+        "title": "Xubuntu",
+        "hex": "0044AA",
+        "source": "https://commons.wikimedia.org/wiki/File:Xubuntu_Icon.svg"
+      }
+    },
+    {
+      "name": "Ubuntu MATE",
+      "slug": "ubuntumate",
+      "hex": "84A454",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/dc7b10662a0a2cfdfc9305e2a2b06c023c30724a/icons/ubuntumate.svg",
+      "brand_source": "https://ubuntu-mate.org",
+      "upstream_metadata": {
+        "title": "Ubuntu MATE",
+        "hex": "84A454",
+        "source": "https://ubuntu-mate.org"
+      }
+    },
+    {
+      "name": "Linux",
+      "slug": "linux",
+      "hex": "FCC624",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/dc7b10662a0a2cfdfc9305e2a2b06c023c30724a/icons/linux.svg",
+      "brand_source": "https://www.linuxfoundation.org/the-linux-mark/",
+      "upstream_metadata": {
+        "title": "Linux",
+        "hex": "FCC624",
+        "source": "https://www.linuxfoundation.org/the-linux-mark/"
+      }
+    }
+  ]
+}

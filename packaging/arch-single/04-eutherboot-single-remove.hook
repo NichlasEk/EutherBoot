@@ -2,6 +2,7 @@
 Operation = Remove
 Type = Package
 Target = linux
+Target = linux-lts
 Target = mkinitcpio
 
 [Action]

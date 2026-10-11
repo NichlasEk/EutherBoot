@@ -1,5 +1,90 @@
 # EutherBoot – System Regis och rescue-USB
 
+## Nu: nya OS-ikoner installerade · 2026-10-11
+
+EutherBoot på den interna ESP:n är uppdaterad med **32 ikoner**: Windows,
+30 Linuxdistributioner/varianter och generell Linux. Ikonen väljs från
+menypostens namn, med stöd för reservsuffix och hela ord. Debian får sin
+spiral; båda befintliga Arch-posterna får den fyllda Arch-symbolen.
+Se `docs/OS-ICONS.md` för namn, källor och licenser.
+
+Den nya produktionens EFI SHA-256:
+`aaa86f2710bf2941b5ed71582d465b8c3997fe6f92dafb1cfd4fe22537082a0b`.
+Matchande källarkiv är också installerat. Båda filerna är synkade och
+hashkontrollerade. Konfigurationen, normal-/LTS-UKI och firmwareposter är
+hash-/textmässigt oförändrade. **Ingen omstart har gjorts.**
+
+160 ikonkontroller i QEMU (alla ikoner, tre teman och tre upplösningar),
+EFI-barnstart/retur och textläge är godkända. Den exakta produktionsfilen
+har också startat och återvänt från båda konfigurerade sökvägarna med
+ersättningsprogram på disponibel disk. Fysisk start med nya EFI:n och
+fysisk LTS-grafik återstår; följ LTS-provet nedan vid nästa omstart.
+
+Säkerhetskopia före ikonuppdateringen:
+`/var/lib/eutherboot-single/before-os-icons/` (tidigare EFI, källarkiv och meny).
+Vid behov kan den gamla `BOOTX64.EFI` och dess `source.tar.gz` återläggas från
+rescue efter att rätt intern ESP identifierats. Ingen GRUB behövs.
+Evidens: `artifacts/icons/installed-result.json`, `install.log`,
+`qemu/result.json`, `production-qemu/result.json` och skärmbilder i samma träd.
+
+## Nu: Arch + LTS installerat utan GRUB · 2026-10-11
+
+Användaren bekräftade fysisk intern normalstart utan USB och beställde sedan
+ett LTS-reservval. **Tillägget är installerat och slutverifierat.**
+
+- **Arch Linux** är standardval, kernel `7.2.9-arch1-1`, timeout 10 sekunder.
+- **Arch Linux LTS (reserv)** är andra valet, kernel `6.18.55-1-lts`.
+- `linux-lts`, `linux-lts-headers` och `nvidia-open-lts` är installerade.
+  NVIDIA `615.78.08` matchar båda kärnornas modulversion/vermagic; alla fyra
+  startmoduler finns i båda initramfs. Btrfs är inbyggt i båda kärnorna.
+- DKMS: system76-io, system76, vboxhost och vhba är byggda och installerade
+  för båda kärnorna. LTS-headers lades till efter initiala fel om saknade
+  headers; de felen är åtgärdade. Ingen fysisk LTS-grafiktest har gjorts.
+- ESP ledigt: **449,863,680 byte (429.0 MiB)**.
+  Båda aktiva bilderna och en temporär normalstor bild får plats med 64 MiB
+  marginal. Storlek/tillväxt kontrolleras också vid framtida publicering.
+- Uppdateringsprofilen hanterar båda bilderna. Verklig kärnuppdatering,
+  LTS-ominstallation, normal/LTS/normal kallstart och negativa felprov är
+  godkända i QEMU på disponibel 1 GiB ESP. Se `docs/VALIDATION.md`.
+- Vid LTS-tillägget var EFI-startfil, NVRAM och bootordning oförändrade.
+  EFI-filen har därefter uppdaterats med ikoner enligt avsnittet ovan; GRUB saknas.
+  Rescue-stickan är fortsatt den fristående återställningsvägen.
+
+### Nästa fysiska prov — användaren gör omstarten
+
+1. Spara arbetet och starta om när det passar.
+2. I EutherBoot, välj **Arch Linux LTS (reserv)** med högerpil eller nedåtpil
+   och Enter. Tangenttryck avbryter nedräkningen.
+3. Kontrollera att skrivbord och grafik fungerar. Öppna detta repo i Codex
+   och skriv ”jag är tillbaka”. Vid problem: välj vanliga **Arch Linux**;
+   om inte heller den fungerar, använd Euther Rescue-stickan.
+
+Agenten ska då börja läsande: `uname -r`, `/proc/cmdline`, `findmnt /`,
+`findmnt /boot`, `nvidia-smi` och relevanta journalfel vid behov.
+Förväntad LTS-kärna är `6.18.55-1-lts`; båda valen använder markören
+`eutherboot.internal=single-v1` och Btrfs `/@`. Kernelversionen skiljer valen.
+Be användaren bekräfta grafikutfallet; paket-/filkontrollen är inte ett
+fysiskt grafiktest. **Återbygg eller installera inte om vid återkomsten.**
+
+### Evidens och återgång
+
+- `artifacts/internal-lts/installed-result.json` och `verify.log` är slutresultat.
+- `install.log` och `headers.log` visar byggningen samt tidigare kontrollfel;
+  verifieraren korrigerades för NVIDIA-filnamn med bindestreck och inbyggd
+  Btrfs. Senaste `verify.log` är godkänd för båda färdiga bilderna.
+- `artifacts/lts-qemu/result.json` och fyra bootloggar är virtuella resultat.
+- Före LTS sparades den då fysiskt fungerande normalbilden i
+  `/var/lib/eutherboot-single/pre-lts-normal.efi`, hashverifierad.
+- Föregående integration/meny finns under
+  `/var/lib/eutherboot-single/before-lts`; äldre komplett ESP-kopia ligger
+  fortfarande i `/var/lib/eutherboot-single/backup`.
+- Läs `docs/INTERNAL-SINGLE-UKI.md` före en eventuell återgång till bara Arch.
+  LTS använder samma rotfilsystem och ersätter inte den fristående rescue-stickan.
+
+Ingen automatisk omstart har gjorts. Fysisk LTS-start återstår.
+
+## Historik: single-installationen före LTS
+
 ## Nu: EutherBoot installerat internt, GRUB borttaget — 2026-10-11
 
 Användaren bekräftade fysisk USB-direktstart och fungerande grafik och bad
@@ -43,7 +128,10 @@ efibootmgr -v
 Förväntad markör är **`eutherboot.internal=single-v1`**, Btrfs FSROOT `/@`
 och kernel `7.2.9-arch1-1` om inget paketbyte skett. Kontrollera menyväg och
 fungerande grafik med användaren. Saknad markör bevisar inte intern start.
-Fysisk intern start är **ännu inte provad**; nuvarande session startades via USB.
+Fysisk intern normalstart **bekräftades 2026-10-11** av användaren och
+livekontroll: intern markör, kernel 7.2.9-arch1-1, Btrfs `/@`, BootCurrent
+0001 (`UEFI OS` på intern ESP) och inga anslutna USB-diskar.
+Användaren har därefter beställt ett separat LTS-reservval utan GRUB.
 Återbygg eller skriv inte om något bara för att användaren återkommer.
 
 ### Verifiering och återställning

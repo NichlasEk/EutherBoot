@@ -3,6 +3,7 @@ Operation = Install
 Operation = Upgrade
 Type = Package
 Target = linux
+Target = linux-lts
 Target = mkinitcpio
 Target = systemd
 Target = systemd-ukify
@@ -16,6 +17,8 @@ Operation = Upgrade
 Operation = Remove
 Target = nvidia
 Target = nvidia-open
+Target = nvidia-lts
+Target = nvidia-open-lts
 Target = nvidia-dkms
 Target = nvidia-open-dkms
 
@@ -40,7 +43,7 @@ Target = usr/lib/libpcsclite.so
 Target = usr/lib/modprobe.d/
 
 [Action]
-Description = Checking EutherBoot single UKI update capacity...
+Description = Checking EutherBoot UKI update capacity...
 When = PreTransaction
 Exec = /usr/bin/python3 /usr/local/lib/eutherboot-single/eutherboot-single.py preflight
 AbortOnFail

@@ -21,6 +21,11 @@ two cold boots verify a persistent guest write. EutherBoot 0.1.1 has also booted
 verified ESPs, and the user confirmed returning to the main menu and chainloading
 the existing GRUB into Arch Linux. Managed installation remains untested physically.
 
+The graphical menu includes 32 name-matched OS icons: Windows, 30 Linux
+distributions/variants and generic Linux, with dark/light/high-contrast rendering.
+See [OS icons and attribution](docs/OS-ICONS.md). Icon recognition is separate
+from installation support.
+
 ## Installation tooling
 
 A plan-first side-by-side installer and managed Arch `linux`/`linux-lts` integration

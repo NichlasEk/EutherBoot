@@ -13,6 +13,7 @@ mod initrd;
 mod input;
 mod linux;
 mod loader;
+mod os_icons;
 mod storage;
 mod timeout;
 mod ui;
@@ -39,6 +40,7 @@ fn trace(_message: &str) {}
 
 fn render(labels: &[&str], menu: &Menu, notice: &str, text: bool) -> bool {
     if !text && graphics::draw(labels, menu.selected, notice).is_ok() {
+        trace("GRAPHICS_READY");
         return false;
     }
     system::with_stdout(|out| {
