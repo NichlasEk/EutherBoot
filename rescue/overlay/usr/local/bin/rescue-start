@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+work="$HOME/work"
+if mountpoint -q /mnt/rescue-data; then work=/mnt/rescue-data/work; fi
+mkdir -p "$work"
+if [[ ! -d "$work/EutherBoot" ]]; then
+    cp -r /usr/local/share/euther-rescue/EutherBoot "$work/EutherBoot"
+    chmod -R u+w "$work/EutherBoot"
+fi
+cd "$work/EutherBoot"
+printf '\nArbetsmapp: %s\n' "$PWD"
+printf 'Codex kräver internet och inloggning. Vid behov: codex login --device-auth\n'
+printf 'Läs /usr/local/share/euther-rescue/RESCUE.md för offlinehjälp.\n\n'
+exec codex

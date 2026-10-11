@@ -1,4 +1,4 @@
-# EutherBoot – handoff efter lyckat fysiskt test av 0.1.1
+# EutherBoot – System Regis och rescue-USB
 
 Uppdaterad 2026-10-11. **Fysiskt test godkänt enligt foto och användarens rapport:
 F4 → Esc → huvudmeny → befintlig bootloader → GRUB → Arch.**
@@ -9,9 +9,32 @@ hittades. Ledigt: 438 767 616 byte (418,4 MiB). Gamla modulrester om cirka
 166,1 MiB finns på rotpartitionen, inte ESP:n. Inget har raderats.
 Se `docs/HOST-COMPATIBILITY.md` för utrymmesstatus.
 
+
+## Rescue-arbetet 2026-10-11
+
+Grafiska System Regis-menyn med godkänt stål-/guldemblem och inställbar
+nedräkning är pushad i `17e20d9`. Den nya grafiken är QEMU-testad; det
+fysiskt bekräftade startförloppet ovan avser fortfarande äldre 0.1.1.
+
+Användaren beställde Arch rescue-USB med förinstallerad Codex och godkände
+uttryckligen att skriva över den anslutna General UDisk-stickan. Rescue har
+egen systemd-boot-start, svensk konsol, Codex CLI 0.162.1 och manuellt ansluten
+ext4-arbetsdata. Intern boot, GRUB och NVRAM ska inte ändras av leveransen.
+
+390 filer från den senast fungerande EFI-kedjan har kopierats och verifierats:
+den tidigare levererade USB-kedjan, interna ESP:n, konfiguration och UUID-data.
+Kopian och ISO:n är privata ignorerade artefakter under `artifacts/rescue/`.
+Läs [rescue/README.md](rescue/README.md) för byggning och användning.
+
+Resultatfiler: `build-result.json`, `test-result.json`, `usb-test-result.json`
+och efter lyckad fysisk skrivning `usb-delivery.json`. Läs dessa före nya
+åtgärder; återskapa eller skriv inte om en redan verifierad sticka utan skäl.
+Den medföljande källkopian i ISO:n är en snapshot av `17e20d9`; dess HANDOFF
+beskriver det äldre fysiska testet, inte den nya rescue-leveransen.
+
 ## Börja här efter omstart
 
-1. Det fysiska starttestet är genomfört; upprepa inte USB-leveransen. Arbeta i `/run/media/nichlas/Kingston1TB/EutherBoot` och läs denna fil.
+1. Läs aktuell rescue-status nedan. Den gamla 0.1.1-leveransen är historik. Arbeta i `/run/media/nichlas/Kingston1TB/EutherBoot`.
 2. Foto och rapport finns sammanfattade nedan; evidens finns i
    `artifacts/physical-0.1.1/`. Vanlig intern start utan USB är ännu inte separat rapporterad.
 3. Läs `artifacts/host-probe-0.1.1/usb-delivery.json` och `usb-result.json`.
@@ -25,7 +48,7 @@ Användaren har godkänt återkommande commit/push och bad uttryckligen om
 kompatibilitetsfixen och USB-uppdateringen. Ingen full installation på intern
 disk är beställd. Licens: GPL-3.0-only.
 
-## Aktuell leverans
+## Historisk leverans: EutherBoot 0.1.1
 
 - **EutherBoot 0.1.1**, kod och matchande källarkiv från commit `8e205dd`.
   Senare handoff-commits ändrar bara dokumentation. Kod och leveransnotering

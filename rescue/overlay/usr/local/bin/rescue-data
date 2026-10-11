@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Explicitly mount an existing data partition. Never format or select by label alone.
+set -euo pipefail
+if [[ $# != 1 || ! -b "$1" ]]; then
+    echo 'Användning: rescue-data /dev/disk/by-uuid/UUID (befintlig ext4-datapartition)' >&2
+    lsblk -o NAME,SIZE,FSTYPE,LABEL,UUID,MOUNTPOINTS
+    exit 2
+fi
+if mountpoint -q /mnt/rescue-data; then echo 'En datapartition är redan monterad.' >&2; exit 1; fi
+kind=$(sudo blkid -s TYPE -o value "$1")
+[[ "$kind" == ext4 ]] || { echo 'Denna version kräver ext4 för beständig data.' >&2; exit 1; }
+if findmnt -rn -S "$1" >/dev/null; then echo 'Partitionen används redan.' >&2; exit 1; fi
+sudo mkdir -p /mnt/rescue-data
+sudo mount -o nodev,nosuid "$1" /mnt/rescue-data
+sudo mkdir -p /mnt/rescue-data/work
+sudo chown rescue:rescue /mnt/rescue-data/work
+printf 'Arbetsfiler sparas nu i /mnt/rescue-data/work. Kör rescue-start.\n'
