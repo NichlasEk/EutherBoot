@@ -119,3 +119,18 @@ Det testet ändrar inte befintlig ISO eller fysisk sticka. Med
 ingen launcher injiceras. Nybyggd ISO ska också
 provas med de vanliga rescue-testerna före ny USB-leverans. Autentiserad session
 på testdatorn återstår.
+
+## Leverans av 0.1.1
+
+2026-10-11: ombyggd ISO och USB-avbild verifierade i QEMU, inklusive riktig
+Codex-start från ISO:ns egna launchers och arbetsdata efter omstart. Källsnapshot
+`e89ed0b` innehåller även den grafiska editorn. General UDisk är uppdaterad och
+fsync slutförd. Befintliga block jämfördes mot avbilden och avvikande block
+skrevs om; ingen separat full återläsning gjordes enligt användarens önskemål.
+GPT och sex startfilers hash (inklusive kärna/initramfs) kontrollerades;
+datapartitionen lämnades monterad på EUTHERDATA.
+Fysiskt test av 0.1.1 och autentiserad Codex-session återstår.
+
+ISO: `artifacts/rescue/euther-rescue-0.1.1-x86_64.iso`.
+SHA-256: `958f0a2614c80c6da17124743a4a613e9519e6c8aeaaa11038ed174c6c18e44b`.
+Privat leveransevidens: `artifacts/rescue/usb-delivery.json`.

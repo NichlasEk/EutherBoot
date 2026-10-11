@@ -10,7 +10,7 @@ hittades. Ledigt: 438 767 616 byte (418,4 MiB). Gamla modulrester om cirka
 Se `docs/HOST-COMPATIBILITY.md` för utrymmesstatus.
 
 
-## Ny rescue 0.1.1 – avbild klar, USB-skrivning väntar
+## Aktuell leverans: Euther Rescue 0.1.1
 
 ISO: `artifacts/rescue/euther-rescue-0.1.1-x86_64.iso`.
 SHA-256: `958f0a2614c80c6da17124743a4a613e9519e6c8aeaaa11038ed174c6c18e44b`.
@@ -19,20 +19,26 @@ Den inbyggda launchern nådde inloggningsvyn i QEMU utan injicerad rättelse;
 komplett USB-layout klarade två starter, nätverk, återställning och persistens.
 Se `artifacts/rescue/{build-result,codex-start-fixed-result,usb-test-result}.json`.
 
-Användaren beställde ny skrivning till samma General UDisk och commit/push.
-Stickan identifierades på nytt (15 728 640 000 byte), datapartitionen var tom.
-UDisks OpenDevice väntade på Polkit-autentisering och nådde tidsgränsen innan
-någon rå skrivning. **Stickan är därför ännu inte uppdaterad till 0.1.1.**
-Nästa steg är autentisering i systemdialogen och skrivning efter förnyad
-identitetskontroll. Lokalt verktyg: `artifacts/rescue/flash-rescue-011.py`;
-kontrollera aktuell diskseq, återanvänd aldrig ett gammalt värde blint.
-Användarens tidigare önskemål att hoppa över separat full återläsning kvarstår.
+General UDisk (15 728 640 000 byte) är uppdaterad till rescue 0.1.1 och
+synkad. Första autentiseringsförsöket hann löpa ut; efter användarens återkomst
+lyckades Polkit och skrivningen slutfördes. Alla block jämfördes mot den
+QEMU-testade avbilden, bara avvikande block skrevs om. Separat full återläsning
+hoppades över enligt användarens tidigare önskemål; båda GPT-kopiorna stämde.
+Sex EFI-partitionsfiler, inklusive kärna och initramfs, hashjämfördes mot
+avbilden. EFI-/datapartitionerna monterades. Datapartitionen
+lämnades vid `/run/media/nichlas/EUTHERDATA`. Mata ut före fysisk flytt.
+
+Leveransresultat: `artifacts/rescue/usb-delivery.json`. Den nya utgåvan ska
+provas fysiskt: UEFI med Secure Boot avstängt, nätverk, `rescue-start`,
+Codex-inloggning och beständig arbetsdata. Förra utgåvan nådde fysiskt rescue-
+autologin men misslyckades i Codex-starten; detta är den korrigerade avbilden.
+Autentiserad AI-session är inte verifierad av QEMU-testet.
 
 Tidigare avbild/resultat/profil finns bevarade i
 `artifacts/rescue/previous-1791713511/`; äldre ISO ligger kvar separat.
 Ingen intern boot eller firmware har ändrats och värden har inte startats om.
 
-## Rescue-arbetet 2026-10-11
+## Historik: rescue-arbetet 2026-10-11
 
 Grafiska System Regis-menyn med godkänt stål-/guldemblem och inställbar
 nedräkning är pushad i `17e20d9`. Den nya grafiken är QEMU-testad; det
@@ -54,7 +60,7 @@ och efter lyckad fysisk skrivning `usb-delivery.json`. Läs dessa före nya
 Den medföljande källkopian i ISO:n är en snapshot av `17e20d9`; dess HANDOFF
 beskriver det äldre fysiska testet, inte den nya rescue-leveransen.
 
-## Aktuell leverans och editor
+## Historik: första rescue-avbilden och editorarbetet
 
 Rescue-stickan är färdigskriven och fsync slutförd. Full återläsning hoppades
 över på användarens uttryckliga begäran. GPT i båda ändar matchade avbilden,
@@ -78,10 +84,11 @@ starta inte om värddatorn. Nästa prioriteringar finns i
 
 ## Börja här efter omstart
 
-1. Läs aktuell rescue-status nedan. Den gamla 0.1.1-leveransen är historik. Arbeta i `/run/media/nichlas/Kingston1TB/EutherBoot`.
+1. Läs aktuell rescue-leverans överst. Den gamla 0.1.1-leveransen är historik. Arbeta i `/run/media/nichlas/Kingston1TB/EutherBoot`.
 2. Foto och rapport finns sammanfattade nedan; evidens finns i
    `artifacts/physical-0.1.1/`. Vanlig intern start utan USB är ännu inte separat rapporterad.
-3. Läs `artifacts/host-probe-0.1.1/usb-delivery.json` och `usb-result.json`.
+3. Läs `artifacts/rescue/usb-delivery.json` och `usb-test-result.json` för aktuell rescue.
+   Historisk EutherBoot-leverans finns under `artifacts/host-probe-0.1.1/`.
    Kontrollera `git status --short --branch` och `git log -3 --oneline`.
 4. Om stickan behöver läsas: identifiera enhet, PARTUUID, storlek och mount på
    nytt. Återanvänd aldrig `/dev/sdf` eller diskseq från förra sessionen blint.

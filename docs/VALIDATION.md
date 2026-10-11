@@ -606,3 +606,10 @@ Komplett USB-avbild klarade två UEFI-starter, nätverk, bootkopians checksummor
 återkopiering till tom FAT och arbetsfil som överlevde omstart. Inga interna
 diskar eller värdens inloggning anslöts till testgästerna. Autentiserad session
 är fortfarande inte verifierad. Fysisk leverans dokumenteras i HANDOFF.md.
+
+Fysisk USB-leverans av rescue 0.1.1 slutförd efter Polkit-autentisering.
+Blockjämförelse följd av skrivning av avvikande block och fsync; båda GPT-
+kopiorna matchar, sex EFI-partitionsfiler (inklusive kärna och initramfs)
+hashmatchar avbilden och datapartitionen monteras. Separat full
+återläsning hoppades över enligt uttryckligt tidigare önskemål. Fysisk start
+av denna nya utgåva återstår. Se lokal `artifacts/rescue/usb-delivery.json`.

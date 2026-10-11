@@ -94,5 +94,5 @@ poster per sida och detaljer bakom F6. F4-upptäckt har fortfarande textgränssn
 och tekniska parser-/lagringsfel har kvar engelska diagnostiktexter. Svenska
 firmwaretangenter och fysisk grafik måste fortfarande provas på datorn.
 
-Den färdigskrivna rescue-leveransen innehåller den tidigare byggda avbilden;
-editorändringarna verifieras och levereras separat i projektets EFI-bygge.
+Rescue 0.1.1 innehåller nu både den nya editorns källkod och projektets
+EFI-release. Rescue-systemets egen start använder fortfarande systemd-boot.

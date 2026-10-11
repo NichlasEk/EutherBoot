@@ -199,3 +199,8 @@ installerar inget, skriver inget USB och ändrar ingen bootordning.
 ## Nästa prioriteringar efter USB-leveransen
 
 Se [rEFInd-genomgång och Secure Boot-spår](docs/REFIND-REVIEW.md).
+
+Rescue 0.1.1 har byggts, QEMU-testats och levererats till General UDisk med
+korrigerad Codex-start och grafisk editor inkluderad. Nästa steg är fysisk
+Codex-inloggning/arbetsdata, sedan direktstart av installerat Arch. Värddatorn
+har inte startats om under bygget eller USB-leveransen.
