@@ -11,4 +11,4 @@ cd "$work/EutherBoot"
 printf '\nArbetsmapp: %s\n' "$PWD"
 printf 'Codex kräver internet och inloggning. Vid behov: codex login --device-auth\n'
 printf 'Läs /usr/local/share/euther-rescue/RESCUE.md för offlinehjälp.\n\n'
-exec codex
+exec codex "$@"

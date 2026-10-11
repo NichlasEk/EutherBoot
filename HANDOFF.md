@@ -37,7 +37,12 @@ beskriver det äldre fysiska testet, inte den nya rescue-leveransen.
 Rescue-stickan är färdigskriven och fsync slutförd. Full återläsning hoppades
 över på användarens uttryckliga begäran. GPT i båda ändar matchade avbilden,
 EFI-filer kontrollerades och EFI-/datapartitionerna monterades. Se lokal
-`artifacts/rescue/usb-delivery.json`. Fysisk start och autentiserad Codex återstår.
+`artifacts/rescue/usb-delivery.json`. Fysisk start till rescue-autologin är nu bekräftad med användarens foto.
+Codex-start misslyckades: saknad state-katalog, sedan ENOSPC. Autentiserad
+Codex återstår. Felet har reproducerats i samma ISO i QEMU. Skapad state-katalog och
+`codex --no-daemon` når inloggningsvyn. Version/help-testet täckte inte detta.
+Aktuell launcher rättar katalogen och använder foreground-läge; ISO/sticka
+är ännu inte uppdaterade. Se rescue/README.md för workaround och test.
 Stickan är osignerad; första testet kräver UEFI med Secure Boot avstängt.
 Interna `/boot` har verifierats oförändrat mot tidigare 366 filhashar.
 

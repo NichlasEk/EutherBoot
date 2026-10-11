@@ -73,3 +73,12 @@ automatiskt. Synka, avmontera och prova firmwarets tillfälliga bootmeny efter
 
 Kopian innehåller maskinspecifika identifierare och är privat. Publicera inte
 ISO:n eller dess known-good-katalog som en generell räddningsdistribution.
+
+## Startfel i rescue 0.1.0
+
+Om Codex rapporterar saknad katalog eller `No space left on device` vid
+bakgrundsserverstart: `mkdir -p ~/.codex`, gå till `~/work/EutherBoot` och kör
+`codex --no-daemon`. Senare rescue-launchers gör detta automatiskt.
+Live-root har begränsat skrivbart RAM-utrymme, separat från USB-datapartitionen.
+Kontrollera `df -h / /home/rescue /tmp /run` och `df -i / /home/rescue /tmp /run`
+om felet kvarstår. Version/help är inte ett test av den interaktiva starten.

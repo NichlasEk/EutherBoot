@@ -575,3 +575,18 @@ No physical UI or autoboot test, USB write, or internal installation occurred.
 - Rescue-USB skrivet och fsync slutförd. Full återläsning uttryckligen bortvald
   av användaren; GPT jämförd och partitioner monterade. Fysisk start återstår.
   Rescue innehåller den äldre källsnapshoten 17e20d9, inte den nya editorn.
+
+## Rescue: fysisk start och korrigerad Codex-launcher
+
+2026-10-11: användarfoto bekräftar fysisk rescue-start till autologin. Codex
+misslyckades med saknad state-katalog och därefter ENOSPC. Den levererade ISO:n
+reproducerade ENOSPC vid riktig terminalstart i QEMU; `--no-daemon` nådde
+inloggningsvyn. Version/help-testerna från första leveransen var otillräckliga.
+
+Aktuella launchers injicerades i en disponibel gästs RAM med oförändrad ISO.
+`scripts/test-rescue-start-qemu.py` passerade: rescue-start från tomt state,
+inloggningsvy, katalogläge 700, --version vidarebefordrat, login status visar
+Not logged in, ingen auth-fil eller daemoninstallation. Resultat och
+launcherhashar: `artifacts/rescue/codex-start-fixed-result.json`.
+Detta verifierar inte en ombyggd ISO, uppdaterad sticka eller autentiserad
+AI-session. Den fysiska stickans workaround finns i rescue/README.md.

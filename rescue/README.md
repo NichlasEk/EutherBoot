@@ -82,3 +82,35 @@ Leveransresultat finns privat i `artifacts/rescue/usb-delivery.json`.
 Startfilen är osignerad: använd UEFI med Secure Boot avstängt för denna utgåva.
 Fysiskt starttest och autentiserad Codex-session återstår. Källsnapshoten är
 `17e20d9`; senare editorändringar finns ännu inte på stickan.
+
+## Codex-start på första rescue-utgåvan
+
+Fysisk start till rescue-autologin är bekräftad 2026-10-11. Första Codex-starten
+visade saknad state-katalog, följt av `No space left on device`. Samma ENOSPC
+reproducerades i den levererade ISO:n i QEMU: Arch live-root har 256 MiB
+skrivbar RAM-overlay. Codex bakgrundsserver misslyckas under starten;
+`--no-daemon` når inloggningsvyn med cirka 5 MiB använt på root.
+Efter det misslyckade försöket är root inte längre fullt, så `df` i efterhand
+kan visa gott om ledigt utrymme. USB-datapartitionen är en separat lagringsyta.
+
+På den redan levererade stickan, utan omstart eller omskrivning:
+
+```bash
+mkdir -p ~/.codex
+cd ~/work/EutherBoot
+codex --no-daemon
+```
+
+Den nya launchern skapar state-katalogen med privata rättigheter och använder
+`--no-daemon` för rescue. `rescue-start` vidarebefordrar nu argument.
+State/inloggning ligger fortsatt i det temporära hemmet; ingen token kopieras
+automatiskt till USB-data. En uttryckligen vald `CODEX_HOME` respekteras.
+En satt CODEX_HOME måste finnas enligt
+[OpenAI-dokumentationen](https://learn.chatgpt.com/docs/config-file/environment-variables).
+
+`python3 scripts/test-rescue-start-qemu.py` injicerar aktuella launchers i en
+disponibel gästs RAM och provar verklig terminalstart till inloggningsvyn,
+privata katalogrättigheter, argument och frånvaro av auth/daemoninstallation.
+Det testet ändrar inte befintlig ISO eller fysisk sticka. Nybyggd ISO ska också
+provas med de vanliga rescue-testerna före ny USB-leverans. Autentiserad session
+på testdatorn återstår.

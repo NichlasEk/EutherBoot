@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# State stays in the live home unless the caller explicitly selected another path.
+rescue_codex_state=${CODEX_HOME:-"$HOME/.codex"}
+if ! (umask 077; mkdir -p -- "$rescue_codex_state"); then
+    printf 'Kan inte skapa Codex-katalogen: %s\n' "$rescue_codex_state" >&2
+    printf 'Kontrollera df -h och df -i för hemkatalogen, /tmp och /run.\n' >&2
+    exit 1
+fi
+export PATH="/opt/codex/codex-path:$PATH"
+# Daemon installation exceeds the Arch ISO's 256 MiB writable overlay.
+# Rescue uses the foreground CLI; never silently install another binary in RAM.
+exec /opt/codex/bin/codex --no-daemon "$@"

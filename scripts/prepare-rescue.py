@@ -82,7 +82,7 @@ with tarfile.open(archive) as tar:
         target.parent.mkdir(parents=True,exist_ok=True)
         target.write_bytes(tar.extractfile(member).read())
         if member.mode & 0o111:executables.append('/opt/codex/'+str(relative))
-(ai/'usr/local/bin/codex').write_text('#!/usr/bin/env bash\nexport PATH="/opt/codex/codex-path:$PATH"\nexec /opt/codex/bin/codex "$@"\n')
+# The checked-in launcher initializes the live user's Codex state directory.
 with (profile/'profiledef.sh').open('a') as f:
     for executable in executables:f.write(f'file_permissions["{executable}"]="0:0:755"\n')
 license_url='https://raw.githubusercontent.com/openai/codex/rust-v0.162.1/LICENSE'
