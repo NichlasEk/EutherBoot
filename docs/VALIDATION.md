@@ -1,5 +1,13 @@
 # Validation · 2026-10-10 · Arch kernel updates and LoadFile2
 
+## Debian physical confirmation · 2026-10-12
+
+Following the 0.1.2 delivery, the user reported “Nu fungerar debian”
+(Debian now works), confirming Debian boots on the physical machine.
+This is user-reported physical evidence in addition to the QEMU results.
+The installed EFI hash and selected initrd size were not independently
+read back from that machine.
+
 ## EutherBoot 0.1.2 large initrd · 2026-10-11
 
 The production policy now allows 1 byte through 512 MiB of external initrd.
@@ -44,7 +52,8 @@ Complete USB image SHA-256:
 `76e54df30b08fc6d701be9e6d057f586f5114b7322b367b478b3049c88ff9b75`.
 See `artifacts/rescue/{build-result,test-result,usb-test-result,codex-start-fixed-result}.json`.
 Physical USB readback/delivery is recorded separately in `usb-delivery.json`;
-physical 0.1.2 boot and installation on Debian remain separate gates.
+physical Debian boot was subsequently confirmed by the user on 2026-10-12
+as recorded above.
 
 Delivery completed: all 15,728,640,000 physical USB bytes were read back after
 fsync and matched the complete image SHA-256 above. After that full check,
@@ -53,7 +62,7 @@ EFI/source hashes, the Debian guide and the explicit ISO PARTUUID boot entry
 were verified from the physical USB. Data was left mounted at EUTHERDATA.
 The ext4 mount can subsequently change filesystem metadata; the whole-device
 hash records the verified pre-mount state. Host internal boot/NVRAM were not
-modified, and the new physical boot remains untested.
+modified. At delivery, physical boot had not yet been tested.
 
 ## Debian 13 initrd size investigation · 2026-10-11
 

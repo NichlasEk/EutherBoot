@@ -26,9 +26,10 @@ ISO: `artifacts/rescue/euther-rescue-0.1.2-x86_64.iso`, SHA-256
 Produktions-EFI SHA-256:
 `7ecc51be45799dc07ae7dc80032f3898ca5d713673f6172bc487d4b70a57c91f`.
 Båda avbildsformaten klarade två QEMU-starter, beständig arbetsdata och nätverk.
-Riktig Codex-start nådde inloggningsvyn med ISO:ns egna launchers. Fysisk
-0.1.2-start och installation/start på Debian-datorn återstår. Evidens finns
-i `artifacts/rescue/usb-delivery.json` och `release-012-validation.json`.
+Riktig Codex-start nådde inloggningsvyn med ISO:ns egna launchers. Användaren
+bekräftade 2026-10-12 att Debian nu fungerar på den fysiska datorn; se
+`../docs/VALIDATION.md`. Evidens från leveransen finns i
+`artifacts/rescue/usb-delivery.json` och `release-012-validation.json`.
 
 Mata ut före flytt, starta stickan, kör `codex login --device-auth` och
 `rescue-start`. Be Codex läsa `/usr/local/share/euther-rescue/INSTALL-DEBIAN.md`

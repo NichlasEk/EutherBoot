@@ -1,5 +1,13 @@
 # EutherBoot – System Regis och rescue-USB
 
+## Debian fungerar på den fysiska datorn · 2026-10-12
+
+Efter leveransen av 0.1.2 bekräftar användaren: ”Nu fungerar debian”.
+Debian-starten är därmed användarbekräftad på den fysiska datorn, utöver
+QEMU-proven nedan. Installerad EFI-hash och initrd-storlek har inte lästs
+tillbaka från den datorn. Ingen ny byggning eller diskskrivning gjordes för
+denna statusuppdatering.
+
 ## Ny räddningsutgåva 0.1.2 för Debian · 2026-10-11
 
 EutherBoot 0.1.2 höjer direktstartens initrd-gräns till **512 MiB** och skiljer
@@ -31,11 +39,11 @@ Codex når inloggningsvyn med ISO:ns egna startskript. Evidens:
 `artifacts/rescue/usb-delivery.json` och `release-012-validation.json`.
 Privata ISO-/backup-/loggartefakter är fortsatt Git-ignorerade.
 
-Nästa steg på Debian-datorn: starta General UDisk, kör
+Instruktionen vid leveransen var: starta General UDisk, kör
 `codex login --device-auth`, sedan `rescue-start`. Be Codex läsa
 `/usr/local/share/euther-rescue/INSTALL-DEBIAN.md` och installera den medföljande
-0.1.2-versionen på den identifierade Debian-installationen. **Fysisk start av
-nya räddningsutgåvan och faktisk Debian-start efter installation återstår.**
+0.1.2-versionen på den identifierade Debian-installationen. Debian fungerar
+nu enligt användarens bekräftelse 2026-10-12 ovan.
 
 USB-provet hittade också att Archiso:s UUID-sökning ibland monterade hela
 USB-disken som ISO och blockerade EUTHERDATA. USB-avbildens startpost binds nu
