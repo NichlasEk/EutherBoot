@@ -241,6 +241,7 @@ fn preview(d: &Draft) -> Result<(), String> {
     if c.theme() == "text"
         || graphics::draw(
             &labels,
+            &crate::kernel_version::collect(c.entries()),
             c.default_index(),
             ui::choose(
                 "UNSAVED PREVIEW - any key returns; nothing will boot.",

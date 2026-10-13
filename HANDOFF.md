@@ -1,5 +1,32 @@
 # EutherBoot – System Regis och rescue-USB
 
+## Kärnversion under ikonerna · 2026-10-12
+
+Arbetskopian visar kärnversion med en mindre textrad under OS-namnet.
+Versionen läses från den valda startfilens UKI-metadata (`.uname`), med
+reservläsning ur inbyggd `.linux`, eller direkt ur x86-kärnans bootheader.
+Ingen hårdkodad version eller ändring av menyformatet behövs. Okänd version,
+läsfel och UKI med flera profiler lämnar versionsraden tom; startvalet finns kvar.
+Textläget visar också versionen. Metadata läses en gång per menysession.
+
+34 boot-core-tester och EFI-bygge godkända. QEMU verifierar kopior av värdens
+normal-/LTS-UKI, direktkärnfixture, post utan version, grafik i tre teman och
+upplösningar samt EFI-barnstart/retur och textläge. Evidens finns i
+`artifacts/kernel-version/`; kör `python3 scripts/test-kernel-version-qemu.py`
+på denna Arch-värd för att upprepa testet med dess två UKI-filer.
+
+Installerad på datorns interna ESP 2026-10-13 efter användarens begäran.
+Startpartitionens PARTUUID verifierades som `c0c71cbf-1505-41f7-bb45-3529bcf8bdb0`.
+`/boot/EFI/BOOT/BOOTX64.EFI` och matchande `EFI/EutherBoot/source.tar.gz`
+är synkade och återlästa med matchande SHA-256. EFI-hash:
+`0680ca970147fe9c1a04e2ef22105ab9119fdf41f5112e203bd7a5959cbbd274`.
+Meny, normal-/LTS-UKI, övriga EFI-filer och firmwareposter är oförändrade.
+Säkerhetskopia: `/var/lib/eutherboot-single/before-kernel-version-20261013/`.
+Installationsresultat: `artifacts/kernel-version/installed-result.json`.
+USB är inte uppdaterad. Fysisk visningskontroll återstår vid nästa manuella
+omstart. Ingen omstart gjord.
+
+
 ## Debian fungerar på den fysiska datorn · 2026-10-12
 
 Efter leveransen av 0.1.2 bekräftar användaren: ”Nu fungerar debian”.

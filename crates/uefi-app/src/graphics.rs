@@ -51,6 +51,31 @@ impl Canvas {
             pen += data[offset] as usize;
         }
     }
+    fn small_width(text: &str) -> usize {
+        let data = include_bytes!("../assets/fonts/small.bin");
+        text.chars()
+            .map(|c| data[boot_core::presentation::glyph_index(c) * 305] as usize)
+            .sum()
+    }
+    fn small_text(&mut self, x: usize, y: usize, text: &str, color: BltPixel) {
+        let data = include_bytes!("../assets/fonts/small.bin");
+        let color = palette(color);
+        let mut pen = x;
+        for ch in text.chars() {
+            let offset = boot_core::presentation::glyph_index(ch) * 305;
+            for yy in 0..19 {
+                for xx in 0..16 {
+                    self.blend(
+                        pen + xx,
+                        y + yy,
+                        color,
+                        data[offset + 1 + yy * 16 + xx] as u32,
+                    );
+                }
+            }
+            pen += data[offset] as usize;
+        }
+    }
     fn width(text: &str, title: bool) -> usize {
         let (data, stride): (&[u8], usize) = if title {
             (include_bytes!("../assets/fonts/title.bin"), 2689)
@@ -236,7 +261,12 @@ fn render(paint: impl FnOnce(&mut Canvas, usize, usize)) -> Result<(), Status> {
     .map_err(|e| e.status())
 }
 
-pub fn draw(labels: &[&str], selected: usize, notice: &str) -> Result<(), Status> {
+pub fn draw(
+    labels: &[&str],
+    versions: &[Option<alloc::string::String>],
+    selected: usize,
+    notice: &str,
+) -> Result<(), Status> {
     render(|c, w, h| {
         let cx = w / 2;
         let compact = h < 600;
@@ -292,11 +322,34 @@ pub fn draw(labels: &[&str], selected: usize, notice: &str) -> Result<(), Status
             }
             c.text(
                 x + (160 - Canvas::width(&label, false)) / 2,
-                top + card_h - 27,
+                top + card_h
+                    - if versions.get(i).and_then(|v| v.as_ref()).is_some() {
+                        38
+                    } else {
+                        27
+                    },
                 &label,
                 false,
                 if i == selected { WHITE } else { MUTED },
             );
+            if let Some(Some(version)) = versions.get(i) {
+                let mut short = version.clone();
+                while Canvas::small_width(&short) > 140 {
+                    short.pop();
+                }
+                if short.len() < version.len() {
+                    while Canvas::small_width(&short) > 125 {
+                        short.pop();
+                    }
+                    short.push_str("...");
+                }
+                c.small_text(
+                    x + (160 - Canvas::small_width(&short)) / 2,
+                    top + card_h - 21,
+                    &short,
+                    MUTED,
+                );
+            }
         }
         let tool_y = top + card_h + 14;
         for (n, title) in [

@@ -4,6 +4,7 @@ pub mod config;
 pub mod discovery;
 pub mod draft;
 pub mod gpt;
+pub mod kernel_version;
 pub mod linux;
 pub mod presentation;
 pub mod transaction;

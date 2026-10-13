@@ -11,6 +11,7 @@ mod image_services;
 mod images;
 mod initrd;
 mod input;
+mod kernel_version;
 mod linux;
 mod loader;
 mod os_icons;
@@ -38,8 +39,14 @@ fn trace(message: &str) {
 #[cfg(not(feature = "qemu-debug"))]
 fn trace(_message: &str) {}
 
-fn render(labels: &[&str], menu: &Menu, notice: &str, text: bool) -> bool {
-    if !text && graphics::draw(labels, menu.selected, notice).is_ok() {
+fn render(
+    labels: &[&str],
+    versions: &[Option<String>],
+    menu: &Menu,
+    notice: &str,
+    text: bool,
+) -> bool {
+    if !text && graphics::draw(labels, versions, menu.selected, notice).is_ok() {
         trace("GRAPHICS_READY");
         return false;
     }
@@ -49,7 +56,12 @@ fn render(labels: &[&str], menu: &Menu, notice: &str, text: bool) -> bool {
     uefi::println!("EUTHERBOOT | SYSTEM REGIS\n");
     let first = menu.selected / 8 * 8;
     for (i, entry) in labels.iter().enumerate().skip(first).take(8) {
-        uefi::println!("{} {}", if i == menu.selected { ">" } else { " " }, entry);
+        uefi::println!(
+            "{} {} {}",
+            if i == menu.selected { ">" } else { " " },
+            entry,
+            versions.get(i).and_then(|v| v.as_deref()).unwrap_or("")
+        );
     }
     uefi::println!(
         "\n{}/{}\n{}\nUp/Down: select  Enter: open  F2: text  F3: editor  F4: discover  Esc: return",
@@ -100,6 +112,7 @@ fn session(allow_timeout: bool) -> Option<Status> {
         config.as_ref().map(|c| c.language()).unwrap_or("en"),
     );
     let entries = config.as_ref().map(|c| c.entries()).unwrap_or(&[]);
+    let versions = kernel_version::collect(entries);
     let mut labels: Vec<&str> = entries.iter().map(|e| e.name()).collect();
     labels.push(ui::choose(
         "Configuration (read-only)",
@@ -141,6 +154,7 @@ fn session(allow_timeout: bool) -> Option<Status> {
     });
     let mut text = render(
         &labels,
+        &versions,
         &menu,
         &notice,
         diagnostic.is_some()
@@ -157,7 +171,7 @@ fn session(allow_timeout: bool) -> Option<Status> {
             }
             Err(s) => {
                 notice = format!("Timer unavailable: {s:?}. Automatic boot disabled.");
-                text = render(&labels, &menu, &notice, text);
+                text = render(&labels, &versions, &menu, &notice, text);
                 None
             }
         }
@@ -289,7 +303,7 @@ fn session(allow_timeout: bool) -> Option<Status> {
                         e.notice()
                     }
                 };
-                text = render(&labels, &menu, &notice, text);
+                text = render(&labels, &versions, &menu, &notice, text);
                 trace("MENU_RESUMED");
             } else {
                 text = true;
@@ -305,12 +319,12 @@ fn session(allow_timeout: bool) -> Option<Status> {
                         config.as_ref().unwrap().timeout()
                     )
                 };
-                text = render(&labels, &menu, &notice, text);
+                text = render(&labels, &versions, &menu, &notice, text);
                 trace("CONFIG_INSPECT");
             }
         } else if redraw {
             trace(&format!("SELECT {}", menu.selected));
-            text = render(&labels, &menu, &notice, text);
+            text = render(&labels, &versions, &menu, &notice, text);
             if let Some(remaining) = countdown_changed {
                 trace(&format!("COUNTDOWN {remaining}"));
             }
